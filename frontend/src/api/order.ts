@@ -30,6 +30,16 @@ export interface OrderQueryParams extends PageParams {
 }
 
 /**
+ * 时间线记录
+ */
+export interface TimeLineItem {
+  time: number
+  action: string
+  description: string
+  operator: string
+}
+
+/**
  * 订单详情
  */
 export interface OrderDetail {
@@ -38,21 +48,20 @@ export interface OrderDetail {
   tableName: string
   startTime: number
   endTime: number | null
+  paidAt: number | null
   duration: number
   pauseDuration: number
+  actualDuration: number
   presetDuration: number | null
   status: 'active' | 'completed'
   amount: number
-  amountDetail: {
-    normalDuration: number
-    normalAmount: number
-    overtimeDuration: number
-    overtimeAmount: number
-    totalAmount: number
-  }
+  normalAmount: number
+  overtimeAmount: number
+  operatorId: string
   operatorName: string
-  paidAt: number | null
   createdAt: number
+  updatedAt: number
+  timeLine: TimeLineItem[]
 }
 
 /**

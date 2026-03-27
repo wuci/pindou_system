@@ -5,10 +5,15 @@ com\pindou\timer\dto\UserInfo.class
 com\pindou\timer\entity\User.class
 com\pindou\timer\dto\LoginRequest.class
 com\pindou\timer\entity\Order.class
+com\pindou\timer\dto\OrderDetailResponse.class
 com\pindou\timer\dto\TableInfoResponse.class
 com\pindou\timer\common\exception\BusinessException.class
 com\pindou\timer\common\result\Result.class
+com\pindou\timer\dto\OrderItemResponse.class
+com\pindou\timer\dto\OrderQueryRequest.class
 com\pindou\timer\common\result\PageResult.class
+com\pindou\timer\entity\SysConfig.class
 com\pindou\timer\dto\LoginResponse.class
 com\pindou\timer\entity\Table.class
+com\pindou\timer\dto\OrderDetailResponse$TimeLineItem.class
 com\pindou\timer\dto\TableConfigRequest.class
