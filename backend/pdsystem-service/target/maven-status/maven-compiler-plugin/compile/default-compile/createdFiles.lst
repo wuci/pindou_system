@@ -1,0 +1,8 @@
+com\pindou\timer\mapper\TableMapper.class
+com\pindou\timer\service\TableService.class
+com\pindou\timer\service\UserService.class
+com\pindou\timer\mapper\UserMapper.class
+com\pindou\timer\mapper\RoleMapper.class
+com\pindou\timer\service\impl\TableServiceImpl.class
+com\pindou\timer\mapper\OrderMapper.class
+com\pindou\timer\service\impl\UserServiceImpl.class

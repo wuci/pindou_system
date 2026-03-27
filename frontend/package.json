@@ -1,0 +1,36 @@
+{
+  "name": "pindou-timer-frontend",
+  "version": "1.0.0",
+  "description": "拼豆店计时管理系统前端",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.7",
+    "axios": "^1.6.8",
+    "element-plus": "^2.7.0",
+    "@element-plus/icons-vue": "^2.3.1",
+    "echarts": "^5.5.0",
+    "dayjs": "^1.11.10"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.8",
+    "vue-tsc": "^2.0.6",
+    "typescript": "^5.4.5",
+    "@types/node": "^20.12.7",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.23.0",
+    "@typescript-eslint/parser": "^7.8.0",
+    "@typescript-eslint/eslint-plugin": "^7.8.0",
+    "sass": "^1.75.0",
+    "unplugin-auto-import": "^0.17.5",
+    "unplugin-vue-components": "^0.26.0"
+  }
+}
