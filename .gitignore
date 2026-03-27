@@ -21,8 +21,10 @@ node_modules/
 # Build outputs
 dist/
 build/
+target/
 *.exe
 *.dmg
+*.jar
 
 # OS
 .DS_Store
