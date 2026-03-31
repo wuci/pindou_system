@@ -19,6 +19,7 @@ public enum ErrorCode {
     NOT_FOUND(404, "资源不存在"),
     CONFLICT(409, "资源冲突"),
     SERVER_ERROR(500, "服务器内部错误"),
+    INVALID_PARAM(4001, "参数无效"),
 
     // ========== 用户相关错误码 10xxx ==========
     USER_NOT_FOUND(10001, "用户不存在"),

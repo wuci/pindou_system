@@ -53,6 +53,13 @@ export const getUserList = (params: UserQueryParams) => {
 }
 
 /**
+ * 获取所有用户列表（不分页）
+ */
+export const getAllUsers = () => {
+  return http.get<UserInfo[]>('/users/all')
+}
+
+/**
  * 新增用户
  */
 export const createUser = (data: CreateUserParams) => {

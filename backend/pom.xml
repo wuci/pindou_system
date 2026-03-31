@@ -20,6 +20,7 @@
     <description>拼豆店计时管理系统</description>
 
     <modules>
+        <module>pdsystem-dto</module>
         <module>pdsystem-util</module>
         <module>pdsystem-entity</module>
         <module>pdsystem-service</module>
@@ -41,6 +42,11 @@
     <dependencyManagement>
         <dependencies>
             <!-- 内部模块依赖 -->
+            <dependency>
+                <groupId>com.pindou</groupId>
+                <artifactId>pdsystem-dto</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.pindou</groupId>
                 <artifactId>pdsystem-util</artifactId>

@@ -24,9 +24,11 @@ export interface OrderInfo {
  * 订单查询参数
  */
 export interface OrderQueryParams extends PageParams {
+  status?: string
   startTime?: number
   endTime?: number
   tableId?: number
+  keyword?: string
 }
 
 /**

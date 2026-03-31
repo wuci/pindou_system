@@ -6,15 +6,17 @@ import type { PageResult, PageParams } from '@/types'
  */
 export interface LogInfo {
   id: string
-  userId: string
+  module: string
+  operation: string
+  description: string
   username: string
-  action: string
-  actionName: string
-  content: string
-  targetType: string | null
-  targetId: string | null
+  method: string
+  params: string
+  result: string
+  duration: number
   ip: string
-  executeTime: number | null
+  status: number
+  errorMsg: string
   createdAt: number
 }
 
@@ -22,10 +24,12 @@ export interface LogInfo {
  * 日志查询参数
  */
 export interface LogQueryParams extends PageParams {
-  userId?: string
-  action?: string
+  module?: string
+  operation?: string
+  username?: string
   startTime?: number
   endTime?: number
+  status?: number
 }
 
 /**
@@ -38,9 +42,6 @@ export const getLogs = (params: LogQueryParams) => {
 /**
  * 导出日志
  */
-export const exportLogs = (params: LogQueryParams) => {
-  return http.get<Blob>('/logs/export', {
-    params,
-    responseType: 'blob'
-  })
+export const exportLogs = (params: Omit<LogQueryParams, 'page' | 'pageSize'>) => {
+  return http.get<LogInfo[]>('/logs/export', { params })
 }

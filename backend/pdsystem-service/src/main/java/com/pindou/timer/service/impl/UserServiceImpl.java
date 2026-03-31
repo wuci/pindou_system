@@ -1,12 +1,15 @@
 package com.pindou.timer.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pindou.timer.common.exception.BusinessException;
-import com.pindou.timer.dto.LoginRequest;
-import com.pindou.timer.dto.LoginResponse;
-import com.pindou.timer.dto.UserInfo;
+import com.pindou.timer.common.result.ErrorCode;
+import com.pindou.timer.common.result.PageResult;
+import com.pindou.timer.dto.*;
 import com.pindou.timer.entity.Role;
 import com.pindou.timer.entity.User;
 import com.pindou.timer.mapper.RoleMapper;
@@ -16,12 +19,14 @@ import com.pindou.timer.util.JwtUtil;
 import com.pindou.timer.util.PasswordUtil;
 import com.pindou.timer.util.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 用户Service实现类
@@ -225,5 +230,197 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         return userInfo;
+    }
+
+    @Override
+    public PageResult<UserResponse> getUserList(UserQueryRequest request) {
+        log.info("获取用户列表: request={}", request);
+
+        // 构建查询条件
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+
+        // 用户名模糊查询
+        if (StringUtils.isNotBlank(request.getUsername())) {
+            wrapper.like(User::getUsername, request.getUsername());
+        }
+
+        // 角色筛选
+        if (StringUtils.isNotBlank(request.getRoleId())) {
+            wrapper.eq(User::getRoleId, request.getRoleId());
+        }
+
+        // 状态筛选
+        if (request.getStatus() != null) {
+            wrapper.eq(User::getStatus, request.getStatus());
+        }
+
+        // 按创建时间倒序
+        wrapper.orderByDesc(User::getCreatedAt);
+
+        // 分页查询
+        Page<User> page = new Page<>(request.getPage(), request.getPageSize());
+        Page<User> resultPage = page(page);
+
+        // 转换结果
+        List<UserResponse> records = resultPage.getRecords().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+
+        PageResult<UserResponse> pageResult = new PageResult<>();
+        pageResult.setList(records);
+        pageResult.setTotal(resultPage.getTotal());
+        pageResult.setPage(request.getPage());
+        pageResult.setPageSize(request.getPageSize());
+
+        log.info("获取用户列表成功: total={}", pageResult.getTotal());
+        return pageResult;
+    }
+
+    @Override
+    public List<UserResponse> getAllUsers() {
+        log.info("获取所有用户列表");
+
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getStatus, 1) // 只查询启用的用户
+                .orderByAsc(User::getCreatedAt);
+
+        List<User> users = list(wrapper);
+
+        return users.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createUser(CreateUserRequest request) {
+        log.info("创建用户: username={}", request.getUsername());
+
+        // 验证用户名唯一性
+        User existUser = getByUsername(request.getUsername());
+        if (existUser != null) {
+            throw new BusinessException(ErrorCode.USERNAME_EXISTS);
+        }
+
+        // 验证角色存在
+        Role role = roleMapper.selectById(request.getRoleId());
+        if (role == null) {
+            throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
+        }
+
+        // 创建用户
+        User user = new User();
+        user.setId(IdUtil.simpleUUID());
+        user.setUsername(request.getUsername());
+        user.setPassword(PasswordUtil.encode(request.getPassword()));
+        user.setNickname(request.getNickname());
+        user.setRoleId(request.getRoleId());
+        user.setStatus(request.getStatus() != null ? request.getStatus() : 1);
+        user.setCreatedAt(System.currentTimeMillis());
+        user.setUpdatedAt(System.currentTimeMillis());
+
+        save(user);
+
+        log.info("创建用户成功: userId={}, username={}", user.getId(), user.getUsername());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUser(String userId, UpdateUserRequest request) {
+        log.info("更新用户: userId={}", userId);
+
+        // 查询用户
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 验证角色存在
+        if (StringUtils.isNotBlank(request.getRoleId())) {
+            Role role = roleMapper.selectById(request.getRoleId());
+            if (role == null) {
+                throw new BusinessException(ErrorCode.ROLE_NOT_FOUND);
+            }
+            user.setRoleId(request.getRoleId());
+        }
+
+        // 更新字段
+        if (StringUtils.isNotBlank(request.getNickname())) {
+            user.setNickname(request.getNickname());
+        }
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        }
+
+        user.setUpdatedAt(System.currentTimeMillis());
+        updateById(user);
+
+        log.info("更新用户成功: userId={}", userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUser(String userId, String operatorId) {
+        log.info("删除用户: userId={}, operatorId={}", userId, operatorId);
+
+        // 不能删除自己
+        if (userId.equals(operatorId)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "不能删除自己");
+        }
+
+        // 查询用户
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 软删除
+        removeById(userId);
+
+        log.info("删除用户成功: userId={}", userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(String userId, String newPassword) {
+        log.info("重置用户密码: userId={}", userId);
+
+        // 查询用户
+        User user = getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 重置密码
+        user.setPassword(PasswordUtil.encode(newPassword));
+        user.setUpdatedAt(System.currentTimeMillis());
+        updateById(user);
+
+        log.info("重置用户密码成功: userId={}", userId);
+    }
+
+    /**
+     * 转换为响应DTO
+     */
+    private UserResponse convertToResponse(User user) {
+        UserResponse response = new UserResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setNickname(user.getNickname());
+        response.setRoleId(user.getRoleId());
+        response.setStatus(user.getStatus());
+        response.setLastLoginAt(user.getLastLoginAt());
+        response.setLastLoginIp(user.getLastLoginIp());
+        response.setCreatedAt(user.getCreatedAt());
+
+        // 查询角色名称
+        if (StringUtils.isNotBlank(user.getRoleId())) {
+            Role role = roleMapper.selectById(user.getRoleId());
+            if (role != null) {
+                response.setRoleName(role.getName());
+            }
+        }
+
+        return response;
     }
 }

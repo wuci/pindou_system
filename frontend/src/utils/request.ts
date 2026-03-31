@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
 import storage from './storage'
+import { ElMessage } from 'element-plus'
 
 // 创建axios实例
 const service: AxiosInstance = axios.create({
@@ -10,6 +11,9 @@ const service: AxiosInstance = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+// 防止重复跳转登录页的标志
+let isLoggingOut = false
 
 /**
  * 请求拦截器
@@ -63,27 +67,36 @@ service.interceptors.response.use(
     if (response) {
       switch (response.status) {
         case 401:
-          // Token过期或无效
-          storage.remove('token')
-          storage.remove('userInfo')
-          window.location.href = '/login'
+          // Token过期或无效，防止重复跳转
+          if (!isLoggingOut) {
+            isLoggingOut = true
+            ElMessage.error('登录已过期，请重新登录')
+            // 清空所有本地存储
+            storage.clear()
+            storage.clearSession()
+            // 延迟跳转，确保消息显示
+            setTimeout(() => {
+              isLoggingOut = false
+              window.location.href = '/login'
+            }, 1000)
+          }
           break
         case 403:
-          console.error('无权限访问')
+          ElMessage.error('无权限访问')
           break
         case 404:
-          console.error('请求的资源不存在')
+          ElMessage.error('请求的资源不存在')
           break
         case 500:
-          console.error('服务器错误')
+          ElMessage.error('服务器错误，请稍后重试')
           break
         default:
-          console.error('请求失败', response.data)
+          ElMessage.error(response.data?.message || '请求失败')
       }
     } else if (error.code === 'ECONNABORTED') {
-      console.error('请求超时')
+      ElMessage.error('请求超时，请检查网络连接')
     } else {
-      console.error('网络错误', error.message)
+      ElMessage.error('网络错误，请检查网络连接')
     }
 
     return Promise.reject(error)

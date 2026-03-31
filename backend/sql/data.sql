@@ -30,7 +30,7 @@ VALUES (
   'a0000000-0000-0000-0000-000000000002',
   '店长',
   'manager',
-  '["table:view","table:start","table:pause","table:end","table:config","order:view","order:detail","order:export","report:view","system:config","user:view","user:create","user:edit","log:view","remind:ignore"]',
+  '["table:view","table:start","table:pause","table:end","table:config","order:view","order:detail","order:export","report:view","system:config","user:view","user:create","user:edit","role:manage","log:view","remind:ignore"]',
   2,
   1,
   1,

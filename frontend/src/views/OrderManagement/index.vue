@@ -22,7 +22,7 @@
             <el-skeleton :rows="5" animated />
           </div>
           <div v-else-if="activeOrders.length === 0" class="empty-container">
-            <el-empty description="暂无进行中的订单" />
+            <el-empty description="暂无当前订单" />
           </div>
           <el-table
             v-else
@@ -53,8 +53,10 @@
             </el-table-column>
             <el-table-column prop="operatorName" label="操作员" width="100" />
             <el-table-column label="状态" width="100">
-              <template #default>
-                <el-tag type="success" size="small">进行中</el-tag>
+              <template #default="{ row }">
+                <el-tag v-if="row.status === 'active'" type="success" size="small">进行中</el-tag>
+                <el-tag v-else-if="row.status === 'completed'" type="info" size="small">已完成</el-tag>
+                <el-tag v-else type="warning" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
@@ -77,6 +79,18 @@
           <!-- 筛选条件 -->
           <div class="filter-container">
             <el-form :inline="true" :model="queryForm" @submit.prevent="handleQuery">
+              <el-form-item label="订单状态">
+                <el-select
+                  v-model="queryForm.status"
+                  placeholder="全部状态"
+                  clearable
+                  style="width: 120px"
+                >
+                  <el-option label="全部" value="all" />
+                  <el-option label="已完成" value="completed" />
+                  <el-option label="进行中" value="active" />
+                </el-select>
+              </el-form-item>
               <el-form-item label="日期范围">
                 <el-date-picker
                   v-model="dateRange"
@@ -150,6 +164,13 @@
             <el-table-column label="总金额" width="120">
               <template #default="{ row }">
                 <span class="amount">¥{{ formatMoney(row.amount) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag v-if="row.status === 'active'" type="success" size="small">进行中</el-tag>
+                <el-tag v-else-if="row.status === 'completed'" type="info" size="small">已完成</el-tag>
+                <el-tag v-else type="warning" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="operatorName" label="操作员" width="100" />
@@ -260,7 +281,7 @@ const loadHistoryOrders = async () => {
   historyLoading.value = true
   try {
     const result = await getHistoryOrders(queryForm)
-    historyOrders.value = result.records
+    historyOrders.value = result.list
     total.value = result.total
   } catch (error) {
     ElMessage.error('加载历史订单失败')

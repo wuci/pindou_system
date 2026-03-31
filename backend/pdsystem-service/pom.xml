@@ -19,6 +19,10 @@
         <!-- 内部模块依赖 -->
         <dependency>
             <groupId>com.pindou</groupId>
+            <artifactId>pdsystem-dto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.pindou</groupId>
             <artifactId>pdsystem-entity</artifactId>
         </dependency>
         <dependency>

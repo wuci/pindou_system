@@ -19,6 +19,10 @@
         <!-- 内部模块依赖 -->
         <dependency>
             <groupId>com.pindou</groupId>
+            <artifactId>pdsystem-dto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.pindou</groupId>
             <artifactId>pdsystem-service</artifactId>
         </dependency>
 
@@ -38,6 +42,12 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Spring Boot AOP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
         <!-- Spring Boot Redis -->

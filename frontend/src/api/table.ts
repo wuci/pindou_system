@@ -7,6 +7,7 @@ import type { PageResult } from '@/types'
 export interface TableInfo {
   id: number
   name: string
+  categoryId: number | null
   status: 'idle' | 'using' | 'paused'
   currentOrderId: string | null
   startTime: number | null
@@ -36,19 +37,48 @@ export interface PauseTableParams {
 }
 
 /**
+ * 账单信息
+ */
+export interface BillInfo {
+  orderId: string
+  tableId: number
+  tableName: string
+  startTime: number
+  endTime: number | null
+  duration: number
+  pauseDuration: number
+  actualDuration: number
+  presetDuration: number | null
+  operatorName: string
+  status: string
+  amountDetail?: {
+    normalAmount: number
+    overtimeAmount: number
+    totalAmount: number
+  }
+}
+
+/**
  * 获取桌台列表
  */
-export const getTableList = (status?: string) => {
+export const getTableList = (status?: string, categoryId?: number) => {
   return http.get<TableInfo[]>('/tables', {
-    params: { status }
+    params: { status, categoryId }
   })
 }
 
 /**
  * 配置桌台数量
  */
-export const configTableCount = (tableCount: number) => {
-  return http.put('/tables/config', { tableCount })
+export const configTableCount = (tableCount: number, categoryId: number) => {
+  return http.put('/tables/config', { tableCount, categoryId })
+}
+
+/**
+ * 更新桌台信息
+ */
+export const updateTable = (id: number, data: { name?: string; categoryId?: number }) => {
+  return http.put(`/tables/${id}`, data)
 }
 
 /**
@@ -80,8 +110,29 @@ export const endTable = (id: number) => {
 }
 
 /**
+ * 获取桌台账单
+ */
+export const getTableBill = (id: number) => {
+  return http.get<BillInfo>(`/tables/${id}/bill`)
+}
+
+/**
  * 忽略提醒
  */
 export const ignoreRemind = (id: number) => {
   return http.post(`/tables/${id}/ignore-remind`)
+}
+
+/**
+ * 删除桌台
+ */
+export const deleteTable = (id: number) => {
+  return http.delete(`/tables/${id}`)
+}
+
+/**
+ * 批量删除桌台
+ */
+export const batchDeleteTables = (tableIds: number[]) => {
+  return http.delete('/tables/batch', { data: { tableIds } })
 }

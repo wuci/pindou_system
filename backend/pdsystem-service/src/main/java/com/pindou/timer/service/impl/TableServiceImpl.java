@@ -1,20 +1,25 @@
 package com.pindou.timer.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.pindou.timer.common.exception.BusinessException;
-import com.pindou.timer.dto.StartTimerRequest;
-import com.pindou.timer.dto.TableConfigRequest;
-import com.pindou.timer.dto.TableInfoResponse;
+import com.pindou.timer.dto.*;
 import com.pindou.timer.entity.Order;
 import com.pindou.timer.entity.Table;
+import com.pindou.timer.event.TableStatusChangeEvent;
 import com.pindou.timer.mapper.OrderMapper;
 import com.pindou.timer.mapper.TableMapper;
+import com.pindou.timer.service.BillingService;
 import com.pindou.timer.service.TableService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,25 +37,34 @@ public class TableServiceImpl implements TableService {
 
     private final TableMapper tableMapper;
     private final OrderMapper orderMapper;
+    private final BillingService billingService;
+
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
 
     // 默认计费配置（从数据库读取，这里先用默认值）
     private static final int DEFAULT_HOURLY_RATE = 30; // 每小时30元
     private static final int MIN_TABLE_COUNT = 1;
     private static final int MAX_TABLE_COUNT = 50;
 
-    public TableServiceImpl(TableMapper tableMapper, OrderMapper orderMapper) {
+    public TableServiceImpl(TableMapper tableMapper, OrderMapper orderMapper, BillingService billingService) {
         this.tableMapper = tableMapper;
         this.orderMapper = orderMapper;
+        this.billingService = billingService;
     }
 
     @Override
-    public List<TableInfoResponse> getTableList(String status) {
-        log.info("获取桌台列表: status={}", status);
+    public List<TableInfoResponse> getTableList(String status, Long categoryId) {
+        log.info("获取桌台列表: status={}, categoryId={}", status, categoryId);
 
         // 构建查询条件
         LambdaQueryWrapper<Table> wrapper = new LambdaQueryWrapper<>();
         if (status != null && !status.isEmpty()) {
             wrapper.eq(Table::getStatus, status);
+        }
+        // 分类筛选（categoryId=0表示全部，不过滤）
+        if (categoryId != null && categoryId > 0) {
+            wrapper.eq(Table::getCategoryId, categoryId);
         }
         wrapper.orderByAsc(Table::getId);
 
@@ -68,35 +82,91 @@ public class TableServiceImpl implements TableService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void updateTable(UpdateTableRequest request) {
+        log.info("更新桌台信息: id={}, name={}", request.getId(), request.getName());
+
+        // 查询桌台
+        Table table = tableMapper.selectById(request.getId());
+        if (table == null) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.NOT_FOUND, "桌台不存在");
+        }
+
+        // 只有空闲状态的桌台可以修改名称和分类
+        if (!"idle".equals(table.getStatus())) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.INVALID_PARAM, "只有空闲状态的桌台可以修改");
+        }
+
+        // 更新桌台信息
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            table.setName(request.getName().trim());
+        }
+        if (request.getCategoryId() != null) {
+            table.setCategoryId(request.getCategoryId());
+        }
+        table.setUpdatedAt(System.currentTimeMillis());
+
+        tableMapper.updateById(table);
+        log.info("更新桌台成功: id={}", request.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void configTableCount(TableConfigRequest request, String userId, String username) {
         Integer tableCount = request.getTableCount();
-        log.info("配置桌台数量: tableCount={}, userId={}", tableCount, userId);
+        Long categoryId = request.getCategoryId();
+        log.info("配置桌台数量: tableCount={}, categoryId={}, userId={}", tableCount, categoryId, userId);
 
         // 验证桌台数量范围
         if (tableCount < MIN_TABLE_COUNT || tableCount > MAX_TABLE_COUNT) {
             throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_COUNT_INVALID);
         }
 
-        // 查询当前桌台数量
-        Long currentCount = tableMapper.selectCount(null);
+        // 查询当前分类下的桌台数量
+        LambdaQueryWrapper<Table> countWrapper = new LambdaQueryWrapper<>();
+        countWrapper.eq(Table::getCategoryId, categoryId);
+        Long currentCount = tableMapper.selectCount(countWrapper);
+
+        log.info("当前分类桌台数量: categoryId={}, count={}", categoryId, currentCount);
 
         if (tableCount > currentCount) {
             // 增加桌台
             int addCount = tableCount - currentCount.intValue();
 
-            // 查询当前最大的桌台ID
+            // 获取当前分类下所有存在的桌台ID
+            LambdaQueryWrapper<Table> existingWrapper = new LambdaQueryWrapper<>();
+            existingWrapper.eq(Table::getCategoryId, categoryId).select(Table::getId);
+            List<Table> existingTables = tableMapper.selectList(existingWrapper);
+            java.util.Set<Integer> existingIds = existingTables.stream()
+                    .map(Table::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            // 查询当前最大的桌台ID（全局）
             LambdaQueryWrapper<Table> maxIdWrapper = new LambdaQueryWrapper<>();
             maxIdWrapper.orderByDesc(Table::getId).last("LIMIT 1");
             Table maxIdTable = tableMapper.selectOne(maxIdWrapper);
-            int startId = (maxIdTable != null ? maxIdTable.getId() : 0) + 1;
+            int maxId = (maxIdTable != null ? maxIdTable.getId() : 0);
 
-            log.info("准备增加桌台: addCount={}, startId={}", addCount, startId);
+            // 收集可用的ID：优先使用1-maxId范围内未被使用的ID
+            java.util.List<Integer> availableIds = new java.util.ArrayList<>();
+            for (int i = 1; i <= maxId && availableIds.size() < addCount; i++) {
+                if (!existingIds.contains(i)) {
+                    availableIds.add(i);
+                }
+            }
+
+            // 如果可用的ID不够，从maxId+1开始补充
+            while (availableIds.size() < addCount) {
+                availableIds.add(++maxId);
+            }
+
+            log.info("准备增加桌台: categoryId={}, addCount={}, availableIds={}", categoryId, addCount, availableIds);
 
             for (int i = 0; i < addCount; i++) {
-                int newId = startId + i;
+                int newId = availableIds.get(i);
                 Table table = new Table();
                 table.setId(newId);
                 table.setName("桌台" + newId);
+                table.setCategoryId(categoryId);
                 table.setStatus("idle");
                 table.setPauseAccumulated(0);
                 table.setReminded(0);
@@ -104,14 +174,15 @@ public class TableServiceImpl implements TableService {
                 table.setCreatedAt(System.currentTimeMillis());
                 table.setUpdatedAt(System.currentTimeMillis());
                 tableMapper.insert(table);
-                log.info("创建桌台: id={}, name={}", newId, table.getName());
+                log.info("创建桌台: id={}, name={}, categoryId={}", newId, table.getName(), categoryId);
             }
-            log.info("增加桌台完成: addCount={}", addCount);
+            log.info("增加桌台完成: categoryId={}, addCount={}", categoryId, addCount);
         } else if (tableCount < currentCount) {
-            // 减少桌台（只能删除空闲的桌台）
+            // 减少桌台（只能删除该分类下空闲的桌台）
             int removeCount = currentCount.intValue() - tableCount;
             LambdaQueryWrapper<Table> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Table::getStatus, "idle")
+            wrapper.eq(Table::getCategoryId, categoryId)
+                    .eq(Table::getStatus, "idle")
                     .orderByDesc(Table::getId)
                     .last("LIMIT " + removeCount);
 
@@ -122,11 +193,12 @@ public class TableServiceImpl implements TableService {
 
             for (Table table : idleTables) {
                 tableMapper.deleteById(table.getId());
+                log.info("删除桌台: id={}, categoryId={}", table.getId(), categoryId);
             }
-            log.info("删除桌台: removeCount={}", removeCount);
+            log.info("删除桌台完成: categoryId={}, removeCount={}", categoryId, removeCount);
         }
 
-        log.info("配置桌台数量成功: tableCount={}", tableCount);
+        log.info("配置桌台数量成功: categoryId={}, tableCount={}", categoryId, tableCount);
     }
 
     @Override
@@ -175,6 +247,9 @@ public class TableServiceImpl implements TableService {
         table.setUpdatedAt(System.currentTimeMillis());
         tableMapper.updateById(table);
 
+        // 推送桌台状态变更
+        eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
+
         log.info("开始计时成功: tableId={}, orderId={}", tableId, order.getId());
 
         return convertToResponse(table);
@@ -201,6 +276,9 @@ public class TableServiceImpl implements TableService {
         table.setLastPauseTime(System.currentTimeMillis());
         table.setUpdatedAt(System.currentTimeMillis());
         tableMapper.updateById(table);
+
+        // 推送桌台状态变更
+        eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
 
         log.info("暂停计时成功: tableId={}", tableId);
     }
@@ -232,6 +310,9 @@ public class TableServiceImpl implements TableService {
         table.setLastPauseTime(null);
         table.setUpdatedAt(System.currentTimeMillis());
         tableMapper.updateById(table);
+
+        // 推送桌台状态变更
+        eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
 
         log.info("恢复计时成功: tableId={}, pauseDuration={}", tableId, pauseDuration);
     }
@@ -271,14 +352,50 @@ public class TableServiceImpl implements TableService {
             throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_STATUS_ERROR);
         }
 
-        // 更新订单状态
+        long now = System.currentTimeMillis();
+
+        // 更新订单状态和计算费用
         if (table.getCurrentOrderId() != null) {
             Order order = orderMapper.selectById(table.getCurrentOrderId());
             if (order != null) {
+                // 计算总时长
+                long start = table.getStartTime();
+                int totalDuration = (int) ((now - start) / 1000);
+
+                // 计算暂停时长
+                int pauseDuration = table.getPauseAccumulated();
+                if ("paused".equals(table.getStatus()) && table.getLastPauseTime() != null) {
+                    pauseDuration += (int) ((now - table.getLastPauseTime()) / 1000);
+                }
+
+                // 计算计费时长
+                int actualDuration = totalDuration - pauseDuration;
+
+                // 计算费用
+                AmountDetail amountDetail = billingService.calculateAmount(actualDuration, table.getPresetDuration());
+
+                // 构建金额明细JSON
+                JSONObject amountJson = new JSONObject();
+                amountJson.set("normalAmount", amountDetail.getNormalAmount());
+                amountJson.set("overtimeAmount", amountDetail.getOvertimeAmount());
+                amountJson.set("totalAmount", amountDetail.getTotalAmount());
+                amountJson.set("actualDuration", actualDuration);
+                amountJson.set("billingType", amountDetail.getBillingType());
+                amountJson.set("unitPrice", amountDetail.getUnitPrice());
+                amountJson.set("overtimeRate", amountDetail.getOvertimeRate());
+
+                // 更新订单
+                order.setEndTime(now);
+                order.setDuration(totalDuration);
+                order.setPauseDuration(pauseDuration);
+                order.setAmount(BigDecimal.valueOf(amountDetail.getTotalAmount()));
+                order.setAmountDetail(amountJson.toString());
                 order.setStatus("completed");
-                order.setUpdatedAt(System.currentTimeMillis());
+                order.setPaidAt(now);
+                order.setUpdatedAt(now);
                 orderMapper.updateById(order);
-                log.info("订单已完成: orderId={}", order.getId());
+
+                log.info("订单已完成: orderId={}, amount={}", order.getId(), amountDetail.getTotalAmount());
             }
         }
 
@@ -291,10 +408,139 @@ public class TableServiceImpl implements TableService {
         table.setLastPauseTime(null);
         table.setReminded(0);
         table.setRemindIgnored(0);
-        table.setUpdatedAt(System.currentTimeMillis());
+        table.setUpdatedAt(now);
         tableMapper.updateById(table);
 
+        // 推送桌台状态变更
+        eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
+
         log.info("结束计时成功: tableId={}", tableId);
+    }
+
+    @Override
+    public BillResponse getBill(Integer tableId) {
+        log.info("获取桌台账单: tableId={}", tableId);
+
+        // 查询桌台
+        Table table = tableMapper.selectById(tableId);
+        if (table == null) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_NOT_FOUND);
+        }
+
+        // 验证桌台状态
+        if (!"using".equals(table.getStatus()) && !"paused".equals(table.getStatus())) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_STATUS_ERROR);
+        }
+
+        // 查询订单
+        Order order = null;
+        if (table.getCurrentOrderId() != null) {
+            order = orderMapper.selectById(table.getCurrentOrderId());
+        }
+        if (order == null) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.ORDER_NOT_FOUND);
+        }
+
+        // 构建账单响应
+        BillResponse response = new BillResponse();
+        response.setOrderId(order.getId());
+        response.setTableId(tableId);
+        response.setTableName(table.getName());
+        response.setStartTime(table.getStartTime());
+        response.setEndTime(null);
+        response.setOperatorName(order.getOperatorName());
+        response.setStatus(order.getStatus());
+        response.setPresetDuration(table.getPresetDuration());
+
+        // 计算时长
+        long now = System.currentTimeMillis();
+        long start = table.getStartTime();
+        int totalDuration = (int) ((now - start) / 1000);
+
+        int pauseDuration = table.getPauseAccumulated();
+        if ("paused".equals(table.getStatus()) && table.getLastPauseTime() != null) {
+            pauseDuration += (int) ((now - table.getLastPauseTime()) / 1000);
+        }
+
+        int actualDuration = totalDuration - pauseDuration;
+
+        response.setDuration(totalDuration);
+        response.setPauseDuration(pauseDuration);
+        response.setActualDuration(actualDuration);
+
+        // 计算费用
+        AmountDetail amountDetail = billingService.calculateAmount(actualDuration, table.getPresetDuration());
+        response.setAmountDetail(amountDetail);
+
+        log.info("获取桌台账单成功: tableId={}, amount={}", tableId, amountDetail.getTotalAmount());
+        return response;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteTable(Integer tableId) {
+        log.info("删除桌台: tableId={}", tableId);
+
+        // 查询桌台
+        Table table = tableMapper.selectById(tableId);
+        if (table == null) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.NOT_FOUND, "桌台不存在");
+        }
+
+        // 只有空闲状态的桌台可以删除
+        if (!"idle".equals(table.getStatus())) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.INVALID_PARAM, "只有空闲状态的桌台可以删除");
+        }
+
+        // 删除桌台
+        tableMapper.deleteById(tableId);
+
+        // 推送桌台状态变更事件
+        eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
+
+        log.info("删除桌台成功: tableId={}", tableId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchDeleteTables(List<Integer> tableIds) {
+        log.info("批量删除桌台: tableIds={}", tableIds);
+
+        if (tableIds == null || tableIds.isEmpty()) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.INVALID_PARAM, "桌台ID列表不能为空");
+        }
+
+        // 查询所有要删除的桌台
+        LambdaQueryWrapper<Table> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(Table::getId, tableIds);
+        List<Table> tables = tableMapper.selectList(wrapper);
+
+        // 检查是否所有桌台都存在且都是空闲状态
+        for (Integer tableId : tableIds) {
+            Table table = tables.stream()
+                    .filter(t -> t.getId().equals(tableId))
+                    .findFirst()
+                    .orElse(null);
+
+            if (table == null) {
+                throw new BusinessException(com.pindou.timer.common.result.ErrorCode.NOT_FOUND,
+                        "桌台 " + tableId + " 不存在");
+            }
+
+            if (!"idle".equals(table.getStatus())) {
+                throw new BusinessException(com.pindou.timer.common.result.ErrorCode.INVALID_PARAM,
+                        "桌台 " + table.getName() + " 不是空闲状态，无法删除");
+            }
+        }
+
+        // 批量删除
+        for (Integer tableId : tableIds) {
+            tableMapper.deleteById(tableId);
+            // 推送桌台状态变更事件
+            eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
+        }
+
+        log.info("批量删除桌台成功: count={}", tableIds.size());
     }
 
     /**
@@ -305,6 +551,7 @@ public class TableServiceImpl implements TableService {
         response.setId(table.getId());
         response.setName(table.getName());
         response.setStatus(table.getStatus());
+        response.setCategoryId(table.getCategoryId());
         response.setCurrentOrderId(table.getCurrentOrderId());
         response.setStartTime(table.getStartTime());
         response.setPresetDuration(table.getPresetDuration());

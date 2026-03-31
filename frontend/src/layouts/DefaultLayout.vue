@@ -7,6 +7,16 @@
           <h2>拼豆店计时管理系统</h2>
         </div>
         <div class="header-right">
+          <!-- 提醒铃铛 -->
+          <div class="remind-bell" @click="toggleRemindPanel">
+            <el-badge :value="remindCount" :hidden="remindCount === 0" :max="99">
+              <el-icon :size="20" :class="{ 'has-remind': remindCount > 0, 'shake': hasNewRemind }">
+                <Bell />
+              </el-icon>
+            </el-badge>
+          </div>
+
+          <!-- 用户下拉菜单 -->
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <el-icon><User /></el-icon>
@@ -75,20 +85,35 @@
         </el-main>
       </el-container>
     </el-container>
+
+    <!-- 提醒面板 -->
+    <RemindPanel
+      ref="remindPanelRef"
+      :sound-enabled="true"
+      @update:count="handleRemindCountUpdate"
+      @remind="handleRemind"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useWebSocketStore } from '@/stores/websocket'
 import { ElMessageBox } from 'element-plus'
+import { Bell } from '@element-plus/icons-vue'
+import RemindPanel from '@/components/RemindPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const webSocketStore = useWebSocketStore()
 
 const activeMenu = computed(() => route.path)
+const remindPanelRef = ref<InstanceType<typeof RemindPanel>>()
+const remindCount = ref(0)
+const hasNewRemind = ref(false)
 
 const hasPermission = (permission: string) => {
   return userStore.hasPermission(permission)
@@ -101,11 +126,44 @@ const handleCommand = (command: string) => {
       cancelButtonText: '取消',
       type: 'warning'
     }).then(() => {
+      webSocketStore.disconnect()
       userStore.logout()
       router.push('/login')
     }).catch(() => {})
   }
 }
+
+// 切换提醒面板
+const toggleRemindPanel = () => {
+  remindPanelRef.value?.toggle()
+  hasNewRemind.value = false
+}
+
+// 处理提醒数量更新
+const handleRemindCountUpdate = (count: number) => {
+  remindCount.value = count
+  if (count > 0) {
+    hasNewRemind.value = true
+    setTimeout(() => {
+      hasNewRemind.value = false
+    }, 2000)
+  }
+}
+
+// 处理新提醒
+const handleRemind = () => {
+  hasNewRemind.value = true
+  setTimeout(() => {
+    hasNewRemind.value = false
+  }, 2000)
+}
+
+// 初始化 WebSocket
+onMounted(() => {
+  if (userStore.userInfo?.id && !webSocketStore.isInitialized) {
+    webSocketStore.init(userStore.userInfo.id)
+  }
+})
 </script>
 
 <style scoped lang="scss">
@@ -120,6 +178,8 @@ const handleCommand = (command: string) => {
   align-items: center;
   background: #fff;
   box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  padding: 0 20px;
+  height: 60px;
 
   .header-left {
     h2 {
@@ -130,6 +190,43 @@ const handleCommand = (command: string) => {
   }
 
   .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .remind-bell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      position: relative;
+
+      &:hover {
+        background-color: #f5f7fa;
+
+        .el-icon {
+          color: #409eff;
+        }
+      }
+
+      .el-icon {
+        color: #606266;
+        transition: color 0.3s ease;
+      }
+
+      .el-icon.has-remind {
+        color: #f56c6c;
+      }
+
+      .el-icon.shake {
+        animation: shake 0.5s ease-in-out;
+      }
+    }
+
     .user-info {
       display: flex;
       align-items: center;
@@ -143,6 +240,18 @@ const handleCommand = (command: string) => {
         background-color: #f5f7fa;
       }
     }
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: rotate(-10deg);
+  }
+  20%, 40%, 60%, 80% {
+    transform: rotate(10deg);
   }
 }
 

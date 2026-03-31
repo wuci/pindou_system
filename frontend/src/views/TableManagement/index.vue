@@ -3,21 +3,54 @@
     <!-- 页面头部 -->
     <el-card class="header-card" shadow="never">
       <div class="header">
-        <div class="header__left">
+        <div class="header__main">
           <h2 class="header__title">桌台管理</h2>
-          <div class="header__stats">
-            <el-tag type="success">空闲: {{ idleCount }}</el-tag>
-            <el-tag type="primary">使用中: {{ usingCount }}</el-tag>
-            <el-tag type="warning">暂停: {{ pausedCount }}</el-tag>
+          <div class="header__actions">
+            <!-- 批量操作按钮 -->
+            <template v-if="batchSelectionMode">
+              <span class="selected-count">已选择 {{ selectedTableIds.size }} 个桌台</span>
+              <el-button type="danger" :icon="Delete" size="small" @click="handleBatchDelete" :disabled="selectedTableIds.size === 0">
+                批量删除
+              </el-button>
+              <el-button size="small" @click="exitBatchSelectMode">退出选择</el-button>
+            </template>
+            <!-- 正常操作按钮 -->
+            <template v-else>
+              <el-button type="primary" :icon="Setting" size="small" @click="showCategoryDialog = true">
+                分类管理
+              </el-button>
+              <el-button v-if="currentCategory !== 0" type="primary" :icon="Setting" size="small" @click="showConfigDialog = true">
+                桌台配置
+              </el-button>
+              <el-button type="warning" :icon="Delete" size="small" @click="enterBatchSelectMode">
+                批量删除
+              </el-button>
+              <el-button :icon="Refresh" size="small" @click="refreshTables" :loading="loading">
+                刷新
+              </el-button>
+            </template>
           </div>
         </div>
-        <div class="header__right">
-          <el-button type="primary" :icon="Setting" @click="showConfigDialog = true">
-            桌台配置
-          </el-button>
-          <el-button :icon="Refresh" @click="refreshTables" :loading="loading">
-            刷新
-          </el-button>
+        <div class="header__bottom">
+          <div class="category-tabs">
+            <div
+              v-for="category in categories"
+              :key="category.id"
+              :class="['category-tab', { active: currentCategory === category.id }]"
+              @click="switchCategory(category.id)"
+            >
+              <el-icon v-if="category.icon">
+                <component :is="category.icon" />
+              </el-icon>
+              <span>{{ category.name }}</span>
+              <span class="count">({{ category.tableCount }})</span>
+            </div>
+          </div>
+          <div class="header__stats">
+            <el-tag size="small" type="success">空闲: {{ idleCount }}</el-tag>
+            <el-tag size="small" type="primary">使用中: {{ usingCount }}</el-tag>
+            <el-tag size="small" type="warning">暂停: {{ pausedCount }}</el-tag>
+          </div>
         </div>
       </div>
     </el-card>
@@ -25,12 +58,19 @@
     <!-- 布局编辑器 -->
     <TableLayoutEditor
       :tables="tables"
+      :category-id="currentCategory"
+      :categories="categories"
+      :selection-mode="batchSelectionMode"
+      :selected-table-ids="selectedTableIds"
       @start="handleStart"
       @pause="handlePause"
       @resume="handleResume"
       @end="handleEnd"
       @ignoreRemind="handleIgnoreRemind"
       @refresh="refreshTables"
+      @edit="handleEdit"
+      @select="handleTableSelect"
+      @batch-delete="handleBatchDelete"
     />
 
     <!-- 开始计时对话框 -->
@@ -40,155 +80,107 @@
       @success="refreshTables"
     />
 
+    <!-- 结账对话框 -->
+    <BillDialog
+      v-model="showBillDialog"
+      :table-id="selectedTable?.id ?? null"
+      @confirmed="refreshTables"
+    />
+
     <!-- 桌台配置对话框 -->
-    <el-dialog
+    <TableConfigDialog
       v-model="showConfigDialog"
-      title="桌台配置"
-      width="500px"
-      :close-on-click-modal="false"
-    >
-      <el-form ref="configFormRef" :model="configForm" :rules="configRules" label-width="120px">
-        <el-alert
-          title="配置说明"
-          type="warning"
-          :closable="false"
-          style="margin-bottom: 20px"
-        >
-          <ul style="margin: 8px 0; padding-left: 20px">
-            <li>增加桌台：自动创建新的空闲桌台</li>
-            <li>减少桌台：只删除空闲状态的桌台</li>
-            <li>桌台数量范围：1-50个</li>
-          </ul>
-        </el-alert>
+      :categories="categories"
+      :tables="tables"
+      :category-id="currentCategory"
+      @success="refreshTables"
+    />
 
-        <el-form-item label="当前桌台数">
-          <el-tag type="info" size="large">{{ tables.length }} 个</el-tag>
-        </el-form-item>
+    <!-- 编辑桌台对话框 -->
+    <EditTableDialog
+      v-model="showEditDialog"
+      :table="editingTable"
+      :categories="categories"
+      @success="handleEditSuccess"
+    />
 
-        <el-form-item label="设置桌台数" prop="tableCount">
-          <el-input-number
-            v-model="configForm.tableCount"
-            :min="1"
-            :max="50"
-            :step="1"
-            controls-position="right"
-            style="width: 200px"
-          />
-        </el-form-item>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="showConfigDialog = false">取消</el-button>
-        <el-button type="primary" :loading="configLoading" @click="handleConfig">
-          确认配置
-        </el-button>
-      </template>
-    </el-dialog>
+    <!-- 分类管理对话框 -->
+    <CategoryDialog
+      v-model="showCategoryDialog"
+      :categories="categories"
+      @refresh="loadCategories"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Setting, Refresh } from '@element-plus/icons-vue'
+import { Setting, Refresh, Delete } from '@element-plus/icons-vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { getTableList, batchDeleteTables, type TableInfo } from '@/api/table'
+import { getCategories, type TableCategoryResponse } from '@/api/tableCategory'
 import TableLayoutEditor from '@/components/TableLayoutEditor.vue'
 import StartTimerDialog from '@/components/StartTimerDialog.vue'
-import { getTableList, configTableCount, pauseTable, resumeTable, endTable, ignoreRemind, type TableInfo } from '@/api/table'
+import BillDialog from '@/components/BillDialog.vue'
+import TableConfigDialog from './components/TableConfigDialog.vue'
+import EditTableDialog from './components/EditTableDialog.vue'
+import CategoryDialog from './components/CategoryDialog.vue'
 
 // 数据
 const tables = ref<TableInfo[]>([])
+const categories = ref<TableCategoryResponse[]>([])
+const currentCategory = ref<number>(0)
 const loading = ref(false)
 const selectedTable = ref<TableInfo | null>(null)
-
-// 对话框状态
+const editingTable = ref<TableInfo | null>(null)
+const selectedTableIds = ref<Set<number>>(new Set())
+const batchSelectionMode = ref(false)
 const showStartDialog = ref(false)
+const showBillDialog = ref(false)
 const showConfigDialog = ref(false)
+const showEditDialog = ref(false)
+const showCategoryDialog = ref(false)
 
-// 配置表单
-const configFormRef = ref<FormInstance>()
-const configForm = ref({
-  tableCount: 10
-})
-const configLoading = ref(false)
-const configRules: FormRules = {
-  tableCount: [
-    { required: true, message: '请输入桌台数量', trigger: 'blur' },
-    {
-      validator: (rule, value, callback) => {
-        if (value < 1 || value > 50) {
-          callback(new Error('桌台数量范围为1-50'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
-}
+let refreshTimer: number | null = null
 
 // 统计数据
-const idleCount = computed(() => {
-  if (!Array.isArray(tables.value)) return 0
-  return tables.value.filter(t => t.status === 'idle').length
-})
-const usingCount = computed(() => {
-  if (!Array.isArray(tables.value)) return 0
-  return tables.value.filter(t => t.status === 'using').length
-})
-const pausedCount = computed(() => {
-  if (!Array.isArray(tables.value)) return 0
-  return tables.value.filter(t => t.status === 'paused').length
-})
+const idleCount = computed(() => tables.value.filter(t => t.status === 'idle').length)
+const usingCount = computed(() => tables.value.filter(t => t.status === 'using').length)
+const pausedCount = computed(() => tables.value.filter(t => t.status === 'paused').length)
 
-// 轮询定时器
-let pollingTimer: number | null = null
-
-// 获取桌台列表
-const fetchTables = async () => {
-  loading.value = true
+// 加载分类
+const loadCategories = async () => {
   try {
-    const data = await getTableList()
+    const data = await getCategories()
+    categories.value = data
+  } catch (error) {
+    console.error('加载分类失败', error)
+  }
+}
 
-    // 确保 tables 始终是数组
-    tables.value = Array.isArray(data) ? data : []
-
-    // 更新配置表单的桌台数量
-    configForm.value.tableCount = tables.value.length
-  } catch (error: any) {
-    console.error('获取桌台列表失败:', error)
-    // 发生错误时，确保 tables 是空数组
-    tables.value = []
-    ElMessage.error(error.message || '获取桌台列表失败')
+// 加载桌台
+const loadTables = async () => {
+  try {
+    loading.value = true
+    const data = await getTableList('', currentCategory.value)
+    tables.value = data
+  } catch (error) {
+    console.error('加载桌台失败', error)
   } finally {
     loading.value = false
   }
 }
 
-// 刷新桌台列表
+// 切换分类
+const switchCategory = (categoryId: number) => {
+  currentCategory.value = categoryId
+  loadTables()
+}
+
+// 刷新桌台
 const refreshTables = () => {
-  fetchTables()
-}
-
-// 启动轮询
-const startPolling = () => {
-  if (pollingTimer !== null) return
-  pollingTimer = window.setInterval(() => {
-    fetchTables()
-  }, 5000) // 每5秒轮询一次
-}
-
-// 停止轮询
-const stopPolling = () => {
-  if (pollingTimer !== null) {
-    clearInterval(pollingTimer)
-    pollingTimer = null
-  }
-}
-
-// 桌台卡片点击事件
-const handleTableClick = (table: TableInfo) => {
-  selectedTable.value = table
-  // 可以在这里添加点击后显示详情的逻辑
+  loadTables()
+  loadCategories()
 }
 
 // 开始计时
@@ -197,224 +189,226 @@ const handleStart = (table: TableInfo) => {
   showStartDialog.value = true
 }
 
-// 暂停计时
+// 暂停
 const handlePause = async (table: TableInfo) => {
-  try {
-    await ElMessageBox.confirm(
-      `确认要暂停 ${table.name} 的计时吗？`,
-      '暂停计时',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await pauseTable(table.id, {})
-    ElMessage.success('暂停计时成功')
-    refreshTables()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.message || '暂停计时失败')
-    }
-  }
+  refreshTables()
 }
 
-// 恢复计时
+// 继续
 const handleResume = async (table: TableInfo) => {
-  try {
-    await ElMessageBox.confirm(
-      `确认要恢复 ${table.name} 的计时吗？`,
-      '恢复计时',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        type: 'info'
-      }
-    )
-
-    await resumeTable(table.id)
-    ElMessage.success('恢复计时成功')
-    refreshTables()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.message || '恢复计时失败')
-    }
-  }
+  refreshTables()
 }
 
-// 结束结账
-const handleEnd = async (table: TableInfo) => {
-  try {
-    await ElMessageBox.confirm(
-      `确认要结束 ${table.name} 的计时并结账吗？`,
-      '结束结账',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await endTable(table.id)
-    ElMessage.success('结账成功')
-    refreshTables()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.message || '结账失败')
-    }
-  }
+// 结束
+const handleEnd = (table: TableInfo) => {
+  selectedTable.value = table
+  showBillDialog.value = true
 }
 
 // 忽略提醒
 const handleIgnoreRemind = async (table: TableInfo) => {
+  refreshTables()
+}
+
+// 编辑桌台
+const handleEdit = (table: TableInfo) => {
+  editingTable.value = table
+  showEditDialog.value = true
+}
+
+// 编辑成功
+const handleEditSuccess = () => {
+  refreshTables()
+  loadCategories()
+}
+
+// 进入批量选择模式
+const enterBatchSelectMode = () => {
+  batchSelectionMode.value = true
+  selectedTableIds.value.clear()
+}
+
+// 退出批量选择模式
+const exitBatchSelectMode = () => {
+  batchSelectionMode.value = false
+  selectedTableIds.value.clear()
+}
+
+// 桌台选择处理
+const handleTableSelect = (tableId: number, selected: boolean) => {
+  if (selected) {
+    selectedTableIds.value.add(tableId)
+  } else {
+    selectedTableIds.value.delete(tableId)
+  }
+}
+
+// 清除选择
+const clearSelection = () => {
+  selectedTableIds.value.clear()
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedTableIds.value.size === 0) {
+    ElMessage.warning('请先选择要删除的桌台')
+    return
+  }
+
+  // 检查选中的桌台是否都是空闲状态
+  const nonIdleTables = tables.value.filter(t =>
+    selectedTableIds.value.has(t.id) && t.status !== 'idle'
+  )
+
+  if (nonIdleTables.length > 0) {
+    ElMessage.warning(`选中的桌台中有 ${nonIdleTables.length} 个正在使用，无法删除`)
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
-      `确认要忽略 ${table.name} 的提醒吗？`,
-      '忽略提醒',
+      `确认要删除选中的 ${selectedTableIds.value.size} 个桌台吗？`,
+      '批量删除',
       {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        type: 'info'
+        type: 'warning',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消'
       }
     )
 
-    // 调用忽略提醒接口
-    await ignoreRemind(table.id)
-    ElMessage.success('已忽略提醒')
+    await batchDeleteTables(Array.from(selectedTableIds.value))
+    ElMessage.success('删除成功')
+    exitBatchSelectMode()
     refreshTables()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error(error.message || '忽略提醒失败')
+      ElMessage.error(error.message || '删除失败')
     }
   }
 }
 
-// 桌台配置
-const handleConfig = async () => {
-  if (!configFormRef.value) return
+// 定时刷新
+const startRefresh = () => {
+  refreshTimer = window.setInterval(() => {
+    loadTables()
+    loadCategories()
+  }, 5000)
+}
 
-  try {
-    await configFormRef.value.validate()
-    configLoading.value = true
-
-    await configTableCount(configForm.value.tableCount)
-
-    ElMessage.success('桌台配置成功')
-    showConfigDialog.value = false
-
-    // 刷新桌台列表
-    await refreshTables()
-  } catch (error: any) {
-    if (error !== false) {
-      ElMessage.error(error.message || '桌台配置失败')
-    }
-  } finally {
-    configLoading.value = false
+const stopRefresh = () => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
   }
 }
 
 // 生命周期
 onMounted(() => {
-  fetchTables()
-  startPolling()
+  loadCategories()
+  loadTables()
+  startRefresh()
 })
 
 onUnmounted(() => {
-  stopPolling()
+  stopRefresh()
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .table-management {
-  padding: 20px;
-  background: #f5f7fa;
-  min-height: 100vh;
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .header-card {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+
+  :deep(.el-card__body) {
+    padding: 16px;
+  }
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+  &__main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
 
-.header__left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
+  &__title {
+    margin: 0;
+    font-size: 18px;
+    color: #303133;
+    font-weight: 500;
+  }
 
-.header__title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
-}
+  &__actions {
+    display: flex;
+    gap: 8px;
+  }
 
-.header__stats {
-  display: flex;
-  gap: 12px;
-}
+  .selected-count {
+    margin-right: 12px;
+    font-size: 14px;
+    color: #606266;
+  }
 
-.header__right {
-  display: flex;
-  gap: 12px;
-}
-
-/* 响应式布局 */
-@media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
+  &__bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 16px;
   }
 
-  .header__left {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .header__right {
-    width: 100%;
-    flex-direction: column;
-  }
-
-  .header__right .el-button {
-    width: 100%;
+  &__stats {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
   }
 }
 
-/* 响应式布局 */
-@media (max-width: 768px) {
-  .table-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-  }
+.category-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
 
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
+  .category-tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background: #f5f7fa;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-size: 13px;
+    white-space: nowrap;
 
-  .header__left {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
+    &:hover {
+      background: #e8ebf0;
+    }
 
-  .header__right {
-    width: 100%;
-    flex-direction: column;
-  }
+    &.active {
+      background: #409eff;
+      color: #fff;
 
-  .header__right .el-button {
-    width: 100%;
+      .count {
+        color: rgba(255, 255, 255, 0.8);
+      }
+    }
+
+    .count {
+      font-size: 11px;
+      color: #909399;
+    }
   }
 }
 </style>

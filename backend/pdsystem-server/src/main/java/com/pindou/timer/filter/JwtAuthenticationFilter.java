@@ -1,5 +1,7 @@
 package com.pindou.timer.filter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pindou.timer.common.result.Result;
 import com.pindou.timer.service.UserService;
 import com.pindou.timer.util.JwtUtil;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -14,6 +16,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 /**
@@ -27,13 +30,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserService userService;
+    private final ObjectMapper objectMapper;
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserService userService) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserService userService, ObjectMapper objectMapper) {
         this.jwtUtil = jwtUtil;
         this.userService = userService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -65,14 +70,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     // 6. 设置到Security上下文
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    // Token无效（Redis中的token不匹配或已过期）
+                    handleUnauthorized(response, "登录已过期，请重新登录");
+                    return;
                 }
             } catch (Exception e) {
-                // Token无效，清除认证信息
-                SecurityContextHolder.clearContext();
+                // Token验证异常
+                handleUnauthorized(response, "Token验证失败");
+                return;
             }
         }
 
         // 7. 继续执行过滤器链
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 处理未授权请求
+     */
+    private void handleUnauthorized(HttpServletResponse response, String message) throws IOException {
+        SecurityContextHolder.clearContext();
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+        Result<Void> result = Result.error(401, message);
+        response.getWriter().write(objectMapper.writeValueAsString(result));
+        response.getWriter().flush();
     }
 }

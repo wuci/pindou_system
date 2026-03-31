@@ -27,6 +27,10 @@ public class Table implements Serializable {
     @TableField("name")
     private String name;
 
+    @Schema(description = "分类ID")
+    @TableField("category_id")
+    private Long categoryId;
+
     @Schema(description = "状态：idle-空闲 using-使用中 paused-暂停")
     @TableField("status")
     private String status;

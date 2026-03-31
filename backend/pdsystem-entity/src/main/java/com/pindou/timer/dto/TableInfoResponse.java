@@ -50,6 +50,9 @@ public class TableInfoResponse implements Serializable {
     @Schema(description = "提醒是否被忽略：1-是 0-否")
     private Integer remindIgnored;
 
+    @Schema(description = "分类ID")
+    private Long categoryId;
+
     @Schema(description = "创建时间（毫秒时间戳）")
     private Long createdAt;
 

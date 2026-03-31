@@ -10,7 +10,14 @@
   >
     <!-- 桌台头部 -->
     <div class="table-card__header">
-      <div class="table-card__name">{{ table.name }}</div>
+      <div class="table-card__name-wrapper">
+        <div class="table-card__name" @click.stop="$emit('edit', table)" :title="'点击编辑桌台名称'">
+          {{ table.name }}
+        </div>
+        <el-icon class="table-card__edit-icon" @click.stop="$emit('edit', table)">
+          <Edit />
+        </el-icon>
+      </div>
       <div class="table-card__status">
         <el-tag :type="statusType" size="small">{{ statusText }}</el-tag>
       </div>
@@ -125,7 +132,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Clock, CircleCheck, Warning, WarningFilled } from '@element-plus/icons-vue'
+import { Clock, CircleCheck, Edit } from '@element-plus/icons-vue'
 import type { TableInfo } from '@/api/table'
 
 interface Props {
@@ -141,6 +148,7 @@ const emit = defineEmits<{
   resume: [table: TableInfo]
   end: [table: TableInfo]
   ignoreRemind: [table: TableInfo]
+  edit: [table: TableInfo]
 }>()
 
 // 状态类型
@@ -355,10 +363,47 @@ const formatFullDateTime = (timestamp: number): string => {
   flex-shrink: 0;
 }
 
+.table-card__name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
 .table-card__name {
   font-size: 16px;
   font-weight: bold;
   color: #303133;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+}
+
+.table-card__name:hover {
+  background: rgba(64, 158, 255, 0.08);
+  color: #409eff;
+}
+
+.table-card__edit-icon {
+  color: #909399;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.table-card__header:hover .table-card__edit-icon {
+  opacity: 1;
+}
+
+.table-card__edit-icon:hover {
+  background: rgba(64, 158, 255, 0.1);
+  color: #409eff;
+  transform: scale(1);
 }
 
 /* 内容区域 */

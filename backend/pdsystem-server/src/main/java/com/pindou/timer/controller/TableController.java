@@ -1,9 +1,11 @@
 package com.pindou.timer.controller;
 
 import com.pindou.timer.common.result.Result;
+import com.pindou.timer.dto.BillResponse;
 import com.pindou.timer.dto.StartTimerRequest;
 import com.pindou.timer.dto.TableConfigRequest;
 import com.pindou.timer.dto.TableInfoResponse;
+import com.pindou.timer.dto.UpdateTableRequest;
 import com.pindou.timer.service.TableService;
 import com.pindou.timer.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,13 +42,31 @@ public class TableController {
     @Operation(summary = "获取桌台列表")
     @GetMapping
     public Result<List<TableInfoResponse>> getTableList(
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long categoryId) {
 
-        log.info("获取桌台列表请求: status={}", status);
+        log.info("获取桌台列表请求: status={}, categoryId={}", status, categoryId);
 
-        List<TableInfoResponse> tables = tableService.getTableList(status);
+        List<TableInfoResponse> tables = tableService.getTableList(status, categoryId);
 
         return Result.success(tables);
+    }
+
+    /**
+     * 更新桌台信息
+     */
+    @Operation(summary = "更新桌台信息")
+    @PutMapping("/{id}")
+    public Result<Void> updateTable(
+            @PathVariable("id") Integer tableId,
+            @RequestBody UpdateTableRequest request) {
+
+        log.info("更新桌台信息请求: tableId={}, name={}", tableId, request.getName());
+
+        request.setId(tableId);
+        tableService.updateTable(request);
+
+        return Result.success();
     }
 
     /**
@@ -221,6 +241,45 @@ public class TableController {
         log.info("忽略提醒请求: tableId={}, userId={}", tableId, userId);
 
         tableService.ignoreRemind(tableId, userId, username);
+
+        return Result.success();
+    }
+
+    /**
+     * 获取桌台账单
+     */
+    @Operation(summary = "获取桌台账单")
+    @GetMapping("/{id}/bill")
+    public Result<BillResponse> getBill(@PathVariable("id") Integer tableId) {
+        log.info("获取桌台账单请求: tableId={}", tableId);
+
+        BillResponse bill = tableService.getBill(tableId);
+
+        return Result.success(bill);
+    }
+
+    /**
+     * 删除桌台
+     */
+    @Operation(summary = "删除桌台")
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteTable(@PathVariable("id") Integer tableId) {
+        log.info("删除桌台请求: tableId={}", tableId);
+
+        tableService.deleteTable(tableId);
+
+        return Result.success();
+    }
+
+    /**
+     * 批量删除桌台
+     */
+    @Operation(summary = "批量删除桌台")
+    @DeleteMapping("/batch")
+    public Result<Void> batchDeleteTables(@RequestBody com.pindou.timer.dto.BatchDeleteTableRequest request) {
+        log.info("批量删除桌台请求: tableIds={}", request.getTableIds());
+
+        tableService.batchDeleteTables(request.getTableIds());
 
         return Result.success();
     }

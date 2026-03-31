@@ -20,6 +20,10 @@ public class TableConfigRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    @Schema(description = "分类ID", required = true, example = "1")
+    @NotNull(message = "分类ID不能为空")
+    private Long categoryId;
+
     @Schema(description = "桌台数量", required = true, example = "10")
     @NotNull(message = "桌台数量不能为空")
     @Min(value = 1, message = "桌台数量不能小于1")
