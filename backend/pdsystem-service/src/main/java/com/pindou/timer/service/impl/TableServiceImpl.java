@@ -1042,6 +1042,15 @@ public class TableServiceImpl implements TableService {
                             log.warn("获取会员信息失败: {}", e.getMessage());
                         }
                     }
+
+                    // 设置支付方式信息
+                    if (currentOrder.getPaymentMethod() != null) {
+                        response.setPaymentMethod(currentOrder.getPaymentMethod());
+                        response.setBalanceAmount(currentOrder.getBalanceAmount() != null ?
+                            currentOrder.getBalanceAmount().doubleValue() : null);
+                        response.setOtherPaymentAmount(currentOrder.getOtherPaymentAmount() != null ?
+                            currentOrder.getOtherPaymentAmount().doubleValue() : null);
+                    }
                 } else {
                     // 如果订单中没有存储费用，则使用计费规则计算（初次计费）
                     // 使用订单中存储的渠道来计算费用
