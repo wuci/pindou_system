@@ -1,5 +1,6 @@
 com\pindou\timer\config\WebMvcConfig.class
 com\pindou\timer\listener\TableStatusChangeListener.class
+com\pindou\timer\controller\ConsumptionRecordController.class
 com\pindou\timer\controller\TableCategoryController.class
 com\pindou\timer\PindouTimerApplication.class
 com\pindou\timer\annotation\LogOperation.class
@@ -16,7 +17,9 @@ com\pindou\timer\controller\LogController.class
 com\pindou\timer\filter\JwtAuthenticationFilter.class
 com\pindou\timer\config\WebSocketConfig.class
 com\pindou\timer\controller\ConfigController.class
+com\pindou\timer\controller\MemberLevelController.class
 com\pindou\timer\config\SecurityConfig.class
+com\pindou\timer\controller\RechargeRecordController.class
 com\pindou\timer\websocket\WebSocketServiceImpl.class
 com\pindou\timer\controller\OrderController.class
 com\pindou\timer\controller\RemindController.class
@@ -26,3 +29,4 @@ com\pindou\timer\common\exception\GlobalExceptionHandler.class
 com\pindou\timer\websocket\WebsocketService.class
 com\pindou\timer\controller\TableController.class
 com\pindou\timer\controller\TableLayoutConfigController.class
+com\pindou\timer\controller\MemberController.class

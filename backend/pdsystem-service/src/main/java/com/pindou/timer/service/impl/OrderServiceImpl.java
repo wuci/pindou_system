@@ -8,9 +8,13 @@ import com.pindou.timer.common.exception.BusinessException;
 import com.pindou.timer.common.result.ErrorCode;
 import com.pindou.timer.common.result.PageResult;
 import com.pindou.timer.dto.*;
+import com.pindou.timer.entity.Member;
+import com.pindou.timer.entity.MemberLevel;
 import com.pindou.timer.entity.Order;
 import com.pindou.timer.mapper.OrderMapper;
 import com.pindou.timer.service.BillingService;
+import com.pindou.timer.service.MemberLevelService;
+import com.pindou.timer.service.MemberService;
 import com.pindou.timer.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -37,6 +41,12 @@ public class OrderServiceImpl implements OrderService {
     @Resource
     private BillingService billingService;
 
+    @Resource
+    private MemberService memberService;
+
+    @Resource
+    private MemberLevelService memberLevelService;
+
     /**
      * 获取今天的起始时间（0点0分0秒）
      */
@@ -45,27 +55,38 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<OrderInfoResponse> getActiveOrders() {
-        log.info("获取当前订单列表");
+    public PageResult<OrderInfoResponse> getActiveOrders(Integer page, Integer pageSize) {
+        log.info("获取当天已完成订单列表: page={}, pageSize={}", page, pageSize);
 
-        // 获取今天0点的时间戳
-        long todayStartTime = getTodayStartTime();
-
-        // 查询今天已完成的订单
+        // 构建查询条件
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Order::getStatus, "completed")
-                .ge(Order::getStartTime, todayStartTime)
-                .orderByDesc(Order::getStartTime);
+        // 查询当天已完成的订单
+        wrapper.eq(Order::getStatus, "completed");
+        // 查询创建时间在今天的订单
+        wrapper.ge(Order::getCreatedAt, getTodayStartTime());
 
-        List<Order> orders = orderMapper.selectList(wrapper);
+        // 按创建时间倒序
+        wrapper.orderByDesc(Order::getCreatedAt);
 
-        // 转换为响应DTO
-        List<OrderInfoResponse> responses = orders.stream()
+        // 分页查询
+        Page<Order> pageObj = new Page<>(page, pageSize);
+        Page<Order> resultPage = orderMapper.selectPage(pageObj, wrapper);
+
+        // 转换结果
+        List<OrderInfoResponse> records = resultPage.getRecords().stream()
                 .map(this::convertToInfoResponse)
                 .collect(Collectors.toList());
 
-        log.info("获取当前订单列表成功: count={}", responses.size());
-        return responses;
+        // 使用 PageResult.of 构建分页结果
+        PageResult<OrderInfoResponse> pageResult = PageResult.of(
+                records,
+                resultPage.getTotal(),
+                page,
+                pageSize
+        );
+
+        log.info("获取当天已完成订单列表成功: total={}, totalPages={}", pageResult.getTotal(), pageResult.getTotalPages());
+        return pageResult;
     }
 
     @Override
@@ -75,15 +96,11 @@ public class OrderServiceImpl implements OrderService {
         // 构建查询条件
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
 
-        // 状态筛选：如果未指定状态，默认查询所有已完成的订单
-        if (StringUtils.isNotBlank(request.getStatus())) {
-            if (!"all".equals(request.getStatus())) {
-                wrapper.eq(Order::getStatus, request.getStatus());
-            }
-        } else {
-            // 默认只查询已完成的订单
-            wrapper.eq(Order::getStatus, "completed");
+        // 状态筛选：如果未指定状态或选择"all"，查询所有状态的订单
+        if (StringUtils.isNotBlank(request.getStatus()) && !"all".equals(request.getStatus())) {
+            wrapper.eq(Order::getStatus, request.getStatus());
         }
+        // status 为空或 "all" 时，不过滤状态，查询所有订单
 
         // 桌台筛选
         if (request.getTableId() != null) {
@@ -106,8 +123,8 @@ public class OrderServiceImpl implements OrderService {
                     .like(Order::getOperatorName, keyword));
         }
 
-        // 按开始时间倒序
-        wrapper.orderByDesc(Order::getStartTime);
+        // 按创建时间倒序
+        wrapper.orderByDesc(Order::getCreatedAt);
 
         // 分页查询
         Page<Order> page = new Page<>(request.getPage(), request.getPageSize());
@@ -118,13 +135,15 @@ public class OrderServiceImpl implements OrderService {
                 .map(this::convertToInfoResponse)
                 .collect(Collectors.toList());
 
-        PageResult<OrderInfoResponse> pageResult = new PageResult<>();
-        pageResult.setList(records);
-        pageResult.setTotal(resultPage.getTotal());
-        pageResult.setPage(request.getPage());
-        pageResult.setPageSize(request.getPageSize());
+        // 使用 PageResult.of 构建分页结果
+        PageResult<OrderInfoResponse> pageResult = PageResult.of(
+                records,
+                resultPage.getTotal(),
+                request.getPage(),
+                request.getPageSize()
+        );
 
-        log.info("获取历史订单列表成功: total={}", pageResult.getTotal());
+        log.info("获取历史订单列表成功: total={}, totalPages={}", pageResult.getTotal(), pageResult.getTotalPages());
         return pageResult;
     }
 
@@ -165,6 +184,7 @@ public class OrderServiceImpl implements OrderService {
     private OrderInfoResponse convertToInfoResponse(Order order) {
         OrderInfoResponse response = new OrderInfoResponse();
         response.setId(order.getId());
+        response.setOrderNo(order.getId()); // 订单编号使用ID
         response.setTableId(order.getTableId());
         response.setTableName(order.getTableName());
         response.setStartTime(order.getStartTime());
@@ -172,15 +192,71 @@ public class OrderServiceImpl implements OrderService {
         response.setDuration(order.getDuration());
         response.setPauseDuration(order.getPauseDuration());
         response.setPresetDuration(order.getPresetDuration());
+        response.setChannel(order.getChannel());
         response.setStatus(order.getStatus());
         response.setOperatorName(order.getOperatorName());
         response.setPaidAt(order.getPaidAt());
         response.setCreatedAt(order.getCreatedAt());
 
-        // 计算当前费用
-        int actualDuration = order.getDuration() - order.getPauseDuration();
-        AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
-        response.setAmount(amountDetail.getTotalAmount());
+        // 调试日志：打印订单的所有字段
+        log.info("转换订单信息: orderId={}, memberId={}, originalAmount={}, amount={}",
+                order.getId(), order.getMemberId(), order.getOriginalAmount(), order.getAmount());
+
+        // 设置会员ID
+        if (order.getMemberId() != null) {
+            response.setMemberId(order.getMemberId());
+        }
+
+        // 优先使用订单中存储的金额，如果没有则重新计算
+        if (order.getAmount() != null && order.getAmount().doubleValue() > 0) {
+            response.setAmount(order.getAmount().doubleValue());
+
+            // 设置原价
+            if (order.getOriginalAmount() != null && order.getOriginalAmount().doubleValue() > 0) {
+                response.setOriginalAmount(order.getOriginalAmount().doubleValue());
+                // 计算折扣金额
+                double discountAmount = order.getOriginalAmount().doubleValue() - order.getAmount().doubleValue();
+                if (discountAmount > 0) {
+                    response.setDiscountAmount(discountAmount);
+                }
+            }
+
+            log.info("使用订单存储金额: orderId={}, amount={}", order.getId(), order.getAmount().doubleValue());
+        } else {
+            // 计算当前费用
+            int actualDuration = order.getDuration() - order.getPauseDuration();
+            AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
+            response.setAmount(amountDetail.getTotalAmount());
+            log.info("重新计算订单金额: orderId={}, amount={}", order.getId(), amountDetail.getTotalAmount());
+        }
+
+        // 填充会员信息
+        if (order.getMemberId() != null) {
+            try {
+                log.info("查询会员信息: orderId={}, memberId={}", order.getId(), order.getMemberId());
+                Member member = memberService.getById(order.getMemberId());
+                if (member != null) {
+                    response.setMemberName(member.getName());
+                    log.info("查询到会员: orderId={}, memberId={}, memberName={}", order.getId(), order.getMemberId(), member.getName());
+
+                    // 获取会员等级信息
+                    if (member.getLevelId() != null) {
+                        MemberLevel memberLevel = memberLevelService.getById(member.getLevelId());
+                        if (memberLevel != null) {
+                            response.setMemberLevelName(memberLevel.getName());
+                            if (memberLevel.getDiscountRate() != null) {
+                                response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
+                            }
+                            log.info("查询到会员等级: orderId={}, levelName={}, discountRate={}", order.getId(), memberLevel.getName(), memberLevel.getDiscountRate());
+                        }
+                    }
+                } else {
+                    log.warn("会员不存在: orderId={}, memberId={}", order.getId(), order.getMemberId());
+                }
+            } catch (Exception e) {
+                log.error("获取会员信息异常: orderId={}, memberId={}, error={}", order.getId(), order.getMemberId(), e.getMessage(), e);
+            }
+        }
 
         return response;
     }
@@ -205,23 +281,91 @@ public class OrderServiceImpl implements OrderService {
         response.setCreatedAt(order.getCreatedAt());
         response.setUpdatedAt(order.getUpdatedAt());
 
-        // 计算计费时长和费用
+        // 计算计费时长
         int actualDuration = order.getDuration() - order.getPauseDuration();
         response.setActualDuration(actualDuration);
 
-        AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
-        response.setNormalAmount(amountDetail.getNormalAmount());
-        response.setOvertimeAmount(amountDetail.getOvertimeAmount());
-        response.setAmount(amountDetail.getTotalAmount());
-        response.setAmountDetailInfo(amountDetail);
+        // 优先使用订单中存储的金额和金额明细，如果没有则重新计算
+        if (order.getAmount() != null && order.getAmount().doubleValue() > 0) {
+            response.setAmount(order.getAmount().doubleValue());
 
-        // 解析金额明细
-        if (StringUtils.isNotBlank(order.getAmountDetail())) {
+            // 设置原价
+            if (order.getOriginalAmount() != null && order.getOriginalAmount().doubleValue() > 0) {
+                response.setOriginalAmount(order.getOriginalAmount().doubleValue());
+            }
+
+            // 尝试解析金额明细JSON
+            if (StringUtils.isNotBlank(order.getAmountDetail())) {
+                try {
+                    JSONObject jsonObject = JSONUtil.parseObj(order.getAmountDetail());
+                    response.setNormalAmount(jsonObject.getDouble("normalAmount"));
+                    response.setOvertimeAmount(jsonObject.getDouble("overtimeAmount"));
+
+                    // 构建AmountDetail对象
+                    AmountDetail amountDetail = new AmountDetail();
+                    amountDetail.setTotalAmount(order.getAmount().doubleValue());
+                    amountDetail.setNormalAmount(response.getNormalAmount());
+                    amountDetail.setOvertimeAmount(response.getOvertimeAmount());
+                    amountDetail.setActualDuration(actualDuration);
+                    amountDetail.setBillingType(jsonObject.getStr("billingType"));
+                    amountDetail.setUnitPrice(jsonObject.getDouble("unitPrice"));
+                    amountDetail.setOvertimeRate(jsonObject.getDouble("overtimeRate"));
+                    response.setAmountDetailInfo(amountDetail);
+
+                    log.info("使用订单存储的金额明细: orderId={}, amount={}", order.getId(), order.getAmount().doubleValue());
+                } catch (Exception e) {
+                    log.warn("解析金额明细失败，重新计算: orderId={}, amountDetail={}", order.getId(), order.getAmountDetail());
+                    // 解析失败，重新计算
+                    AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
+                    response.setNormalAmount(amountDetail.getNormalAmount());
+                    response.setOvertimeAmount(amountDetail.getOvertimeAmount());
+                    response.setAmountDetailInfo(amountDetail);
+                }
+            } else {
+                // 没有金额明细，使用订单金额创建简单的明细
+                AmountDetail amountDetail = new AmountDetail();
+                amountDetail.setTotalAmount(order.getAmount().doubleValue());
+                amountDetail.setNormalAmount(order.getAmount().doubleValue());
+                amountDetail.setOvertimeAmount(0.0);
+                amountDetail.setActualDuration(actualDuration);
+                amountDetail.setBillingType("preset");
+                amountDetail.setUnitPrice(order.getAmount().doubleValue());
+                amountDetail.setOvertimeRate(1.0);
+                response.setNormalAmount(order.getAmount().doubleValue());
+                response.setOvertimeAmount(0.0);
+                response.setAmountDetailInfo(amountDetail);
+            }
+        } else {
+            // 订单没有金额，重新计算
+            AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
+            response.setNormalAmount(amountDetail.getNormalAmount());
+            response.setOvertimeAmount(amountDetail.getOvertimeAmount());
+            response.setAmount(amountDetail.getTotalAmount());
+            response.setAmountDetailInfo(amountDetail);
+            log.info("重新计算订单金额: orderId={}, amount={}", order.getId(), amountDetail.getTotalAmount());
+        }
+
+        // 填充会员信息
+        if (order.getMemberId() != null) {
             try {
-                JSONObject jsonObject = JSONUtil.parseObj(order.getAmountDetail());
-                // 可以根据需要解析更多字段
+                Member member = memberService.getById(order.getMemberId());
+                if (member != null) {
+                    response.setMemberId(member.getId());
+                    response.setMemberName(member.getName());
+
+                    // 获取会员等级信息
+                    if (member.getLevelId() != null) {
+                        MemberLevel memberLevel = memberLevelService.getById(member.getLevelId());
+                        if (memberLevel != null) {
+                            response.setMemberLevelName(memberLevel.getName());
+                            if (memberLevel.getDiscountRate() != null) {
+                                response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
+                            }
+                        }
+                    }
+                }
             } catch (Exception e) {
-                log.warn("解析金额明细失败: orderId={}, amountDetail={}", order.getId(), order.getAmountDetail());
+                log.warn("获取订单详情会员信息失败: orderId={}, memberId={}, error={}", order.getId(), order.getMemberId(), e.getMessage());
             }
         }
 

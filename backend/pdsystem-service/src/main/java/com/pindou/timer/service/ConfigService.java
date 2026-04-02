@@ -2,6 +2,7 @@ package com.pindou.timer.service;
 
 import com.pindou.timer.dto.BillingRuleConfigRequest;
 import com.pindou.timer.dto.RemindConfigRequest;
+import com.pindou.timer.dto.SystemConfigRequest;
 
 import java.util.Map;
 
@@ -64,4 +65,19 @@ public interface ConfigService {
      * @return 是否成功
      */
     Boolean updateTableCountConfig(Integer count);
+
+    /**
+     * 获取系统参数配置
+     *
+     * @return 系统参数配置JSON
+     */
+    String getSystemConfig();
+
+    /**
+     * 更新系统参数配置
+     *
+     * @param request 配置请求
+     * @return 是否成功
+     */
+    Boolean updateSystemConfig(SystemConfigRequest request);
 }

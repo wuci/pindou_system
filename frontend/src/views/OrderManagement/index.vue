@@ -30,36 +30,57 @@
             stripe
             style="width: 100%"
           >
-            <el-table-column prop="tableName" label="桌台名称" width="120" />
-            <el-table-column label="开始时间" width="180">
+            <el-table-column label="订单编号" width="160">
+              <template #default="{ row }">
+                <span class="order-no">{{ row.orderNo || row.id }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="tableName" label="桌台" width="80" />
+            <el-table-column label="渠道" width="90">
+              <template #default="{ row }">
+                <el-tag :type="getChannelType(row.channel)" size="small">{{ getChannelName(row.channel) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="开始时间" width="140">
               <template #default="{ row }">
                 {{ formatDateTime(row.startTime) }}
               </template>
             </el-table-column>
-            <el-table-column label="使用时长" width="120">
+            <el-table-column label="时长" width="90">
               <template #default="{ row }">
-                {{ formatDuration(row.duration) }}
+                <div>{{ formatDuration(row.duration) }}</div>
+                <div v-if="row.pauseDuration > 0" class="pause-text">
+                  暂停{{ formatDuration(row.pauseDuration) }}
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="预设时长" width="120">
+            <el-table-column label="费用明细" width="120">
               <template #default="{ row }">
-                {{ row.presetDuration ? formatDuration(row.presetDuration) : '不设时长' }}
+                <div v-if="row.originalAmount && row.originalAmount > row.amount">
+                  <div style="font-size: 11px; color: #909399;">原价 ¥{{ formatMoney(row.originalAmount) }}</div>
+                  <div style="font-size: 13px; color: #409eff; font-weight: 600;">实付 ¥{{ formatMoney(row.amount) }}</div>
+                </div>
+                <div v-else>
+                  <span style="font-size: 13px; font-weight: 600; color: #409eff;">¥{{ formatMoney(row.amount) }}</span>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="当前费用" width="120">
+            <el-table-column label="会员信息" width="100">
               <template #default="{ row }">
-                <span class="amount">¥{{ formatMoney(row.amount) }}</span>
+                <div v-if="row.memberName" style="font-size: 12px;">
+                  <div style="color: #303133; font-weight: 500;">{{ row.memberName }}</div>
+                  <div v-if="row.memberDiscountRate" style="color: #67c23a;">{{ (row.memberDiscountRate * 10).toFixed(1) }}折</div>
+                </div>
+                <span v-else style="color: #909399; font-size: 12px;">非会员</span>
               </template>
             </el-table-column>
-            <el-table-column prop="operatorName" label="操作员" width="100" />
-            <el-table-column label="状态" width="100">
+            <el-table-column label="状态" width="80">
               <template #default="{ row }">
                 <el-tag v-if="row.status === 'active'" type="success" size="small">进行中</el-tag>
                 <el-tag v-else-if="row.status === 'completed'" type="info" size="small">已完成</el-tag>
-                <el-tag v-else type="warning" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column label="操作" width="80" fixed="right">
               <template #default="{ row }">
                 <el-button
                   type="primary"
@@ -72,6 +93,19 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <!-- 分页 -->
+          <div class="pagination-container">
+            <el-pagination
+              v-model:current-page="activeQueryForm.page"
+              v-model:page-size="activeQueryForm.pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="activeTotal"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleActiveSizeChange"
+              @current-change="handleActivePageChange"
+            />
+          </div>
         </el-tab-pane>
 
         <!-- 历史订单 -->
@@ -86,8 +120,9 @@
                   clearable
                   style="width: 120px"
                 >
-                  <el-option label="全部" value="all" />
+                  <el-option label="全部" value="" />
                   <el-option label="已完成" value="completed" />
+                  <el-option label="已作废" value="cancelled" />
                   <el-option label="进行中" value="active" />
                 </el-select>
               </el-form-item>
@@ -145,40 +180,62 @@
             stripe
             style="width: 100%"
           >
-            <el-table-column prop="tableName" label="桌台名称" width="120" />
-            <el-table-column label="开始时间" width="180">
+            <el-table-column label="订单编号" width="160">
               <template #default="{ row }">
-                {{ formatDateTime(row.startTime) }}
+                <span class="order-no">{{ row.orderNo || row.id }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="结束时间" width="180">
+            <el-table-column prop="tableName" label="桌台" width="80" />
+            <el-table-column label="渠道" width="90">
               <template #default="{ row }">
-                {{ row.endTime ? formatDateTime(row.endTime) : '-' }}
+                <el-tag :type="getChannelType(row.channel)" size="small">{{ getChannelName(row.channel) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="使用时长" width="120">
+            <el-table-column label="时间" width="180">
               <template #default="{ row }">
-                {{ formatDuration(row.duration) }}
+                <div style="font-size: 12px;">
+                  <div>{{ formatDateTime(row.startTime) }}</div>
+                  <div v-if="row.endTime" style="color: #909399;">至 {{ formatDateTime(row.endTime) }}</div>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="总金额" width="120">
+            <el-table-column label="时长" width="90">
               <template #default="{ row }">
-                <span class="amount">¥{{ formatMoney(row.amount) }}</span>
+                <div>{{ formatDuration(row.duration) }}</div>
+                <div v-if="row.pauseDuration > 0" class="pause-text">
+                  暂停{{ formatDuration(row.pauseDuration) }}
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="100">
+            <el-table-column label="费用明细" width="120">
+              <template #default="{ row }">
+                <div v-if="row.originalAmount && row.originalAmount > row.amount">
+                  <div style="font-size: 11px; color: #909399;">原价 ¥{{ formatMoney(row.originalAmount) }}</div>
+                  <div style="font-size: 13px; color: #409eff; font-weight: 600;">实付 ¥{{ formatMoney(row.amount) }}</div>
+                </div>
+                <div v-else>
+                  <span style="font-size: 13px; font-weight: 600; color: #409eff;">¥{{ formatMoney(row.amount) }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="会员信息" width="100">
+              <template #default="{ row }">
+                <div v-if="row.memberName" style="font-size: 12px;">
+                  <div style="color: #303133; font-weight: 500;">{{ row.memberName }}</div>
+                  <div v-if="row.memberDiscountRate" style="color: #67c23a;">{{ (row.memberDiscountRate * 10).toFixed(1) }}折</div>
+                </div>
+                <span v-else style="color: #909399; font-size: 12px;">非会员</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="80">
               <template #default="{ row }">
                 <el-tag v-if="row.status === 'active'" type="success" size="small">进行中</el-tag>
                 <el-tag v-else-if="row.status === 'completed'" type="info" size="small">已完成</el-tag>
+                <el-tag v-else-if="row.status === 'cancelled'" type="danger" size="small">已作废</el-tag>
                 <el-tag v-else type="warning" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="operatorName" label="操作员" width="100" />
-            <el-table-column label="支付时间" width="180">
-              <template #default="{ row }">
-                {{ row.paidAt ? formatDateTime(row.paidAt) : '-' }}
-              </template>
-            </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
                 <el-button
@@ -194,7 +251,7 @@
           </el-table>
 
           <!-- 分页 -->
-          <div class="pagination-container" v-if="total > 0">
+          <div class="pagination-container">
             <el-pagination
               v-model:current-page="queryForm.page"
               v-model:page-size="queryForm.pageSize"
@@ -228,6 +285,11 @@ import OrderDetailDrawer from '@/components/OrderDetailDrawer.vue'
 const activeTab = ref('active')
 const activeLoading = ref(false)
 const activeOrders = ref<OrderInfo[]>([])
+const activeTotal = ref(0)
+const activeQueryForm = reactive({
+  page: 1,
+  pageSize: 10
+})
 
 // 历史订单
 const historyLoading = ref(false)
@@ -238,7 +300,7 @@ const dateRange = ref<number[]>([])
 const queryForm = reactive({
   page: 1,
   pageSize: 10,
-  status: 'completed',
+  status: '',
   tableId: undefined as number | undefined,
   keyword: '',
   startTime: undefined as number | undefined,
@@ -257,18 +319,29 @@ onMounted(() => {
   loadHistoryOrders()
 })
 
-const handleTabChange = (tabName: string) => {
-  if (tabName === 'active' && activeOrders.value.length === 0) {
-    loadActiveOrders()
-  } else if (tabName === 'history' && historyOrders.value.length === 0) {
-    loadHistoryOrders()
+const handleTabChange = (tabName: string | number) => {
+  const name = String(tabName)
+  if (name === 'active') {
+    if (activeOrders.value.length === 0) {
+      activeQueryForm.page = 1
+      loadActiveOrders()
+    }
+  } else if (name === 'history') {
+    if (historyOrders.value.length === 0) {
+      queryForm.page = 1
+      loadHistoryOrders()
+    }
   }
 }
 
 const loadActiveOrders = async () => {
   activeLoading.value = true
   try {
-    activeOrders.value = await getActiveOrders()
+    console.log('加载当前订单，参数：', activeQueryForm)
+    const result = await getActiveOrders(activeQueryForm)
+    console.log('当前订单返回结果：', result)
+    activeOrders.value = result.list || []
+    activeTotal.value = result.total || 0
   } catch (error) {
     ElMessage.error('加载当前订单失败')
     console.error(error)
@@ -280,9 +353,11 @@ const loadActiveOrders = async () => {
 const loadHistoryOrders = async () => {
   historyLoading.value = true
   try {
+    console.log('加载历史订单，参数：', queryForm)
     const result = await getHistoryOrders(queryForm)
-    historyOrders.value = result.list
-    total.value = result.total
+    console.log('历史订单返回结果：', result)
+    historyOrders.value = result.list || []
+    total.value = result.total || 0
   } catch (error) {
     ElMessage.error('加载历史订单失败')
     console.error(error)
@@ -317,14 +392,29 @@ const handleDateChange = (values: number[]) => {
 }
 
 const handlePageChange = (page: number) => {
+  console.log('历史订单页码变化：', page)
   queryForm.page = page
   loadHistoryOrders()
 }
 
 const handleSizeChange = (size: number) => {
+  console.log('历史订单每页大小变化：', size)
   queryForm.pageSize = size
   queryForm.page = 1
   loadHistoryOrders()
+}
+
+const handleActivePageChange = (page: number) => {
+  console.log('当前订单页码变化：', page)
+  activeQueryForm.page = page
+  loadActiveOrders()
+}
+
+const handleActiveSizeChange = (size: number) => {
+  console.log('当前订单每页大小变化：', size)
+  activeQueryForm.pageSize = size
+  activeQueryForm.page = 1
+  loadActiveOrders()
 }
 
 const handleViewDetail = (orderId: string) => {
@@ -336,7 +426,7 @@ const handleExport = async () => {
   exporting.value = true
   try {
     const data = await exportOrders({
-      status: 'completed',
+      status: queryForm.status,
       tableId: queryForm.tableId,
       startTime: queryForm.startTime,
       endTime: queryForm.endTime,
@@ -390,6 +480,24 @@ const formatDuration = (seconds: number) => {
 const formatMoney = (amount: number) => {
   return amount.toFixed(2)
 }
+
+const getChannelName = (channel: string) => {
+  const map: Record<string, string> = {
+    store: '店内',
+    meituan: '美团',
+    dianping: '大众点评'
+  }
+  return map[channel] || channel
+}
+
+const getChannelType = (channel: string): 'success' | 'warning' | 'danger' | 'info' => {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
+    store: 'success',
+    meituan: 'warning',
+    dianping: 'danger'
+  }
+  return map[channel] || 'info'
+}
 </script>
 
 <style scoped>
@@ -427,5 +535,22 @@ const formatMoney = (amount: number) => {
 .amount {
   font-weight: 600;
   color: #409eff;
+}
+
+.has-pause {
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+.order-no {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  color: #606266;
+}
+
+.pause-text {
+  font-size: 11px;
+  color: #e6a23c;
+  margin-top: 2px;
 }
 </style>

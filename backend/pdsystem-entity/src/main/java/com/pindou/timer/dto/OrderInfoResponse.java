@@ -20,6 +20,9 @@ public class OrderInfoResponse implements Serializable {
     @Schema(description = "订单ID")
     private String id;
 
+    @Schema(description = "订单编号")
+    private String orderNo;
+
     @Schema(description = "桌台编号")
     private Integer tableId;
 
@@ -41,14 +44,35 @@ public class OrderInfoResponse implements Serializable {
     @Schema(description = "预设时长（秒）")
     private Integer presetDuration;
 
-    @Schema(description = "状态：active-进行中 completed-已完成")
+    @Schema(description = "渠道：store-店内 meituan-美团 dianping-大众点评")
+    private String channel;
+
+    @Schema(description = "状态：active-进行中 completed-已完成 cancelled-已作废")
     private String status;
 
     @Schema(description = "当前费用（元）")
     private Double amount;
 
+    @Schema(description = "原价（折扣前，元）")
+    private Double originalAmount;
+
+    @Schema(description = "折扣金额（元）")
+    private Double discountAmount;
+
     @Schema(description = "操作员姓名")
     private String operatorName;
+
+    @Schema(description = "会员ID")
+    private Long memberId;
+
+    @Schema(description = "会员名称")
+    private String memberName;
+
+    @Schema(description = "会员等级名称")
+    private String memberLevelName;
+
+    @Schema(description = "会员折扣率")
+    private Double memberDiscountRate;
 
     @Schema(description = "支付时间（毫秒时间戳）")
     private Long paidAt;

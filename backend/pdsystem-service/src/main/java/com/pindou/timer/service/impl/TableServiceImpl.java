@@ -8,10 +8,15 @@ import com.pindou.timer.common.exception.BusinessException;
 import com.pindou.timer.dto.*;
 import com.pindou.timer.entity.Order;
 import com.pindou.timer.entity.Table;
+import com.pindou.timer.entity.Member;
+import com.pindou.timer.entity.MemberLevel;
 import com.pindou.timer.event.TableStatusChangeEvent;
 import com.pindou.timer.mapper.OrderMapper;
 import com.pindou.timer.mapper.TableMapper;
 import com.pindou.timer.service.BillingService;
+import com.pindou.timer.service.ConfigService;
+import com.pindou.timer.service.MemberService;
+import com.pindou.timer.service.MemberLevelService;
 import com.pindou.timer.service.TableService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,19 +43,24 @@ public class TableServiceImpl implements TableService {
     private final TableMapper tableMapper;
     private final OrderMapper orderMapper;
     private final BillingService billingService;
-
-    @Resource
-    private ApplicationEventPublisher eventPublisher;
+    private final ConfigService configService;
+    private final MemberService memberService;
+    private final MemberLevelService memberLevelService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 默认计费配置（从数据库读取，这里先用默认值）
     private static final int DEFAULT_HOURLY_RATE = 30; // 每小时30元
     private static final int MIN_TABLE_COUNT = 1;
     private static final int MAX_TABLE_COUNT = 50;
 
-    public TableServiceImpl(TableMapper tableMapper, OrderMapper orderMapper, BillingService billingService) {
+    public TableServiceImpl(TableMapper tableMapper, OrderMapper orderMapper, BillingService billingService, ConfigService configService, MemberService memberService, MemberLevelService memberLevelService, ApplicationEventPublisher eventPublisher) {
         this.tableMapper = tableMapper;
         this.orderMapper = orderMapper;
         this.billingService = billingService;
+        this.configService = configService;
+        this.memberService = memberService;
+        this.memberLevelService = memberLevelService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -132,9 +142,9 @@ public class TableServiceImpl implements TableService {
             // 增加桌台
             int addCount = tableCount - currentCount.intValue();
 
-            // 获取当前分类下所有存在的桌台ID
+            // 获取所有已存在的桌台ID（全局，因为ID是唯一主键）
             LambdaQueryWrapper<Table> existingWrapper = new LambdaQueryWrapper<>();
-            existingWrapper.eq(Table::getCategoryId, categoryId).select(Table::getId);
+            existingWrapper.select(Table::getId);
             List<Table> existingTables = tableMapper.selectList(existingWrapper);
             java.util.Set<Integer> existingIds = existingTables.stream()
                     .map(Table::getId)
@@ -204,7 +214,7 @@ public class TableServiceImpl implements TableService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TableInfoResponse startTimer(Integer tableId, StartTimerRequest request, String userId, String username) {
-        log.info("开始计时: tableId={}, presetDuration={}, userId={}", tableId, request.getPresetDuration(), userId);
+        log.info("开始计时: tableId={}, presetDuration={}, memberId={}, userId={}", tableId, request.getPresetDuration(), request.getMemberId(), userId);
 
         // 查询桌台
         Table table = tableMapper.selectById(tableId);
@@ -217,6 +227,35 @@ public class TableServiceImpl implements TableService {
             throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_STATUS_ERROR);
         }
 
+        // 计算初始费用（根据预设时长）
+        Integer presetDuration = request.getPresetDuration() == 0 ? null : request.getPresetDuration();
+        double originalAmount = 0.0;
+        double finalAmount = 0.0;
+
+        if (presetDuration != null) {
+            // 使用预设时长计算费用
+            AmountDetail amountDetail = billingService.calculateAmount(presetDuration, presetDuration);
+            originalAmount = amountDetail.getTotalAmount();
+            finalAmount = originalAmount;
+
+            // 如果选择了会员，应用折扣
+            if (request.getMemberId() != null) {
+                try {
+                    CalculateDiscountRequest discountRequest = new CalculateDiscountRequest();
+                    discountRequest.setOriginalAmount(java.math.BigDecimal.valueOf(originalAmount));
+                    CalculateDiscountResponse discountResponse = memberService.calculateDiscount(request.getMemberId(), discountRequest);
+                    if (discountResponse != null) {
+                        finalAmount = discountResponse.getFinalAmount().doubleValue();
+                        log.info("会员折扣: originalAmount={}, discountAmount={}, finalAmount={}",
+                                originalAmount, discountResponse.getDiscountAmount(), finalAmount);
+                    }
+                } catch (Exception e) {
+                    log.warn("计算会员折扣失败，使用原价: {}", e.getMessage());
+                    finalAmount = originalAmount;
+                }
+            }
+        }
+
         // 创建订单
         Order order = new Order();
         order.setId(IdUtil.simpleUUID());
@@ -225,10 +264,13 @@ public class TableServiceImpl implements TableService {
         order.setStartTime(System.currentTimeMillis());
         order.setDuration(0);
         order.setPauseDuration(0);
-        order.setPresetDuration(request.getPresetDuration() == 0 ? null : request.getPresetDuration());
+        order.setPresetDuration(presetDuration);
+        order.setChannel(request.getChannel() != null ? request.getChannel() : "store"); // 默认店内
+        order.setMemberId(request.getMemberId());
+        order.setOriginalAmount(java.math.BigDecimal.valueOf(originalAmount));
         order.setStatus("active");
-        order.setAmount(BigDecimal.ZERO);
-        order.setAmountDetail("{\"normalFee\":0,\"overtimeFee\":0,\"totalFee\":0}");
+        order.setAmount(java.math.BigDecimal.valueOf(finalAmount));
+        order.setAmountDetail("{\"normalFee\":" + originalAmount + ",\"overtimeFee\":0,\"totalFee\":" + finalAmount + "}");
         order.setOperatorId(userId);
         order.setOperatorName(username);
         order.setCreatedAt(System.currentTimeMillis());
@@ -239,7 +281,7 @@ public class TableServiceImpl implements TableService {
         table.setStatus("using");
         table.setCurrentOrderId(order.getId());
         table.setStartTime(System.currentTimeMillis());
-        table.setPresetDuration(request.getPresetDuration() == 0 ? null : request.getPresetDuration());
+        table.setPresetDuration(presetDuration);
         table.setPauseAccumulated(0);
         table.setLastPauseTime(null);
         table.setReminded(0);
@@ -250,7 +292,8 @@ public class TableServiceImpl implements TableService {
         // 推送桌台状态变更
         eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
 
-        log.info("开始计时成功: tableId={}, orderId={}", tableId, order.getId());
+        log.info("开始计时成功: tableId={}, orderId={}, memberId={}, originalAmount={}, finalAmount={}",
+                tableId, order.getId(), request.getMemberId(), originalAmount, finalAmount);
 
         return convertToResponse(table);
     }
@@ -319,6 +362,75 @@ public class TableServiceImpl implements TableService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public TableInfoResponse extendTimer(Integer tableId, com.pindou.timer.dto.ExtendTableRequest request, String userId, String username) {
+        log.info("续费时长: tableId={}, additionalDuration={}, userId={}", tableId, request.getAdditionalDuration(), userId);
+
+        // 查询桌台
+        Table table = tableMapper.selectById(tableId);
+        if (table == null) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_NOT_FOUND);
+        }
+
+        // 验证桌台状态 - 只有使用中或暂停状态可以续费
+        if (!"using".equals(table.getStatus()) && !"paused".equals(table.getStatus())) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.TABLE_STATUS_ERROR);
+        }
+
+        // 查询当前订单
+        LambdaQueryWrapper<Order> orderWrapper = new LambdaQueryWrapper<>();
+        orderWrapper.eq(Order::getId, table.getCurrentOrderId());
+        Order order = orderMapper.selectOne(orderWrapper);
+
+        if (order == null) {
+            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.ORDER_NOT_FOUND);
+        }
+
+        // 计算续费费用（根据续费时长）
+        AmountDetail extendAmountDetail = billingService.calculateAmount(
+                request.getAdditionalDuration(),
+                request.getAdditionalDuration()  // 续费时长本身作为预设时长来计算费用
+        );
+        double extendFee = extendAmountDetail.getTotalAmount();
+
+        // 获取当前订单已存储的费用
+        double currentAmount = order.getAmount() != null ? order.getAmount().doubleValue() : 0.0;
+
+        // 计算新的总费用
+        double newTotalAmount = currentAmount + extendFee;
+
+        // 更新订单的预设时长和费用
+        Integer currentPresetDuration = order.getPresetDuration();
+        Integer newPresetDuration;
+
+        if (currentPresetDuration == null) {
+            // 如果当前是不限时，续费后变成具体时长
+            newPresetDuration = request.getAdditionalDuration();
+        } else {
+            // 累加续费时长
+            newPresetDuration = currentPresetDuration + request.getAdditionalDuration();
+        }
+
+        order.setPresetDuration(newPresetDuration);
+        order.setAmount(BigDecimal.valueOf(newTotalAmount));
+        order.setUpdatedAt(System.currentTimeMillis());
+        orderMapper.updateById(order);
+
+        // 更新桌台的预设时长
+        table.setPresetDuration(newPresetDuration);
+        table.setUpdatedAt(System.currentTimeMillis());
+        tableMapper.updateById(table);
+
+        // 推送桌台状态变更
+        eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
+
+        log.info("续费时长成功: tableId={}, orderId={}, oldPresetDuration={}, newPresetDuration={}, extendFee={}, newTotalAmount={}",
+                tableId, order.getId(), currentPresetDuration, newPresetDuration, extendFee, newTotalAmount);
+
+        return convertToResponse(table);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void ignoreRemind(Integer tableId, String userId, String username) {
         log.info("忽略提醒: tableId={}, userId={}", tableId, userId);
 
@@ -338,8 +450,9 @@ public class TableServiceImpl implements TableService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void endTimer(Integer tableId, String userId, String username) {
-        log.info("结束计时: tableId={}, userId={}", tableId, userId);
+    public void endTimer(Integer tableId, EndTableRequest request, String userId, String username) {
+        Long memberId = request != null ? request.getMemberId() : null;
+        log.info("结束计时: tableId={}, userId={}, memberId={}", tableId, userId, memberId);
 
         // 查询桌台
         Table table = tableMapper.selectById(tableId);
@@ -356,6 +469,7 @@ public class TableServiceImpl implements TableService {
 
         // 更新订单状态和计算费用
         if (table.getCurrentOrderId() != null) {
+            // 重新查询订单以确保获取最新的累加金额
             Order order = orderMapper.selectById(table.getCurrentOrderId());
             if (order != null) {
                 // 计算总时长
@@ -371,8 +485,82 @@ public class TableServiceImpl implements TableService {
                 // 计算计费时长
                 int actualDuration = totalDuration - pauseDuration;
 
-                // 计算费用
-                AmountDetail amountDetail = billingService.calculateAmount(actualDuration, table.getPresetDuration());
+                // 判断订单状态：使用时长小于5分钟的订单标记为作废
+                String orderStatus;
+                if (actualDuration < 300) { // 5分钟 = 300秒
+                    orderStatus = "cancelled";
+                    log.info("订单使用时长不足5分钟，标记为作废: orderId={}, actualDuration={}", order.getId(), actualDuration);
+                } else {
+                    orderStatus = "completed";
+                }
+
+                // 优先使用订单中已有的累加费用，如果没有则重新计算
+                double finalAmount;
+                double originalAmount;
+                AmountDetail amountDetail;
+
+                // 打印日志用于调试
+                log.info("结账时订单金额: orderId={}, amount={}, originalAmount={}", order.getId(), order.getAmount(), order.getOriginalAmount());
+
+                if (order.getAmount() != null && order.getAmount().doubleValue() > 0) {
+                    // 使用订单中累加的费用（初始费用 + 续费费用）
+                    finalAmount = order.getAmount().doubleValue();
+
+                    // 如果订单有原价，使用订单的原价；否则原价等于最终金额
+                    if (order.getOriginalAmount() != null && order.getOriginalAmount().doubleValue() > 0) {
+                        originalAmount = order.getOriginalAmount().doubleValue();
+                        log.info("使用订单存储的原价: orderId={}, originalAmount={}", order.getId(), originalAmount);
+                    } else {
+                        originalAmount = finalAmount;
+                        log.info("订单无原价，使用最终金额作为原价: orderId={}, originalAmount={}", order.getId(), originalAmount);
+                    }
+
+                    // 仍然调用计费服务生成费用明细结构，但使用订单中的金额
+                    amountDetail = new AmountDetail();
+                    amountDetail.setTotalAmount(finalAmount);
+                    amountDetail.setNormalAmount(finalAmount);
+                    amountDetail.setOvertimeAmount(0.0);
+                    amountDetail.setBillingType("preset");
+                    amountDetail.setActualDuration(actualDuration);
+                    amountDetail.setUnitPrice(finalAmount); // 使用总金额作为单价（套餐计费）
+                    amountDetail.setOvertimeRate(1.0);
+
+                    log.info("使用订单累加费用: orderId={}, originalAmount={}, finalAmount={}", order.getId(), originalAmount, finalAmount);
+                } else {
+                    // 订单中没有费用，重新计算
+                    amountDetail = billingService.calculateAmount(actualDuration, table.getPresetDuration());
+                    originalAmount = amountDetail.getTotalAmount();
+                    finalAmount = originalAmount;
+                    log.info("重新计算费用: orderId={}, originalAmount={}, finalAmount={}", order.getId(), originalAmount, finalAmount);
+                }
+
+                // 应用会员折扣（只有在订单没有应用过折扣的情况下才需要应用）
+                // 判断条件：订单没有原价，或者原价等于最终价格（说明没有折扣）
+                boolean needApplyDiscount = false;
+                if (memberId != null) {
+                    if (order.getOriginalAmount() == null || order.getOriginalAmount().doubleValue() == 0) {
+                        // 订单没有原价，需要应用折扣
+                        needApplyDiscount = true;
+                        log.info("订单无原价，需要应用会员折扣: memberId={}, originalAmount={}", memberId, originalAmount);
+                    } else if (Math.abs(order.getOriginalAmount().doubleValue() - order.getAmount().doubleValue()) < 0.01) {
+                        // 原价等于最终价格，说明没有折扣，需要应用
+                        needApplyDiscount = true;
+                        log.info("订单未应用折扣，需要应用会员折扣: memberId={}, originalAmount={}", memberId, originalAmount);
+                    } else {
+                        log.info("订单已应用折扣，跳过: memberId={}, originalAmount={}, finalAmount={}", memberId, order.getOriginalAmount(), order.getAmount());
+                    }
+                }
+
+                if (needApplyDiscount) {
+                    log.info("应用会员折扣: memberId={}, originalAmount={}", memberId, originalAmount);
+                    CalculateDiscountRequest discountRequest = new CalculateDiscountRequest();
+                    discountRequest.setOriginalAmount(BigDecimal.valueOf(originalAmount));
+                    CalculateDiscountResponse discountResponse = memberService.calculateDiscount(memberId, discountRequest);
+                    finalAmount = discountResponse.getFinalAmount().doubleValue();
+                    log.info("会员折扣已应用: originalAmount={}, discountRate={}, discountAmount={}, finalAmount={}",
+                            originalAmount, discountResponse.getDiscountRate(),
+                            discountResponse.getDiscountAmount(), finalAmount);
+                }
 
                 // 构建金额明细JSON
                 JSONObject amountJson = new JSONObject();
@@ -388,14 +576,23 @@ public class TableServiceImpl implements TableService {
                 order.setEndTime(now);
                 order.setDuration(totalDuration);
                 order.setPauseDuration(pauseDuration);
-                order.setAmount(BigDecimal.valueOf(amountDetail.getTotalAmount()));
+                order.setOriginalAmount(BigDecimal.valueOf(originalAmount)); // 保存原价
+                order.setAmount(BigDecimal.valueOf(finalAmount)); // 保存折后价格
+                order.setMemberId(memberId); // 保存会员ID
                 order.setAmountDetail(amountJson.toString());
-                order.setStatus("completed");
-                order.setPaidAt(now);
+                order.setStatus(orderStatus);
+                order.setPaidAt("completed".equals(orderStatus) ? now : null); // 作废订单不记录支付时间
                 order.setUpdatedAt(now);
                 orderMapper.updateById(order);
 
-                log.info("订单已完成: orderId={}, amount={}", order.getId(), amountDetail.getTotalAmount());
+                // 更新会员累计消费（仅已完成的订单）
+                if ("completed".equals(orderStatus) && memberId != null) {
+                    memberService.updateTotalAmount(memberId, BigDecimal.valueOf(originalAmount));
+                    log.info("会员累计消费已更新: memberId={}, amount={}", memberId, originalAmount);
+                }
+
+                log.info("订单已结束: orderId={}, status={}, originalAmount={}, finalAmount={}",
+                        order.getId(), orderStatus, originalAmount, finalAmount);
             }
         }
 
@@ -468,12 +665,101 @@ public class TableServiceImpl implements TableService {
         response.setPauseDuration(pauseDuration);
         response.setActualDuration(actualDuration);
 
-        // 计算费用
-        AmountDetail amountDetail = billingService.calculateAmount(actualDuration, table.getPresetDuration());
+        // 计算费用：优先使用订单中累加的费用
+        AmountDetail amountDetail;
+
+        // 打印日志用于调试
+        log.info("获取账单时订单金额: orderId={}, amount={}", order.getId(), order.getAmount());
+
+        if (order.getAmount() != null && order.getAmount().doubleValue() > 0) {
+            // 使用订单中累加的费用
+            double finalAmount = order.getAmount().doubleValue();
+
+            // 直接创建费用明细，不调用billingService.calculateAmount（避免覆盖）
+            amountDetail = new AmountDetail();
+            amountDetail.setTotalAmount(finalAmount);
+            amountDetail.setNormalAmount(finalAmount);
+            amountDetail.setOvertimeAmount(0.0);
+            amountDetail.setBillingType("preset");
+            amountDetail.setActualDuration(actualDuration);
+            amountDetail.setUnitPrice(finalAmount); // 使用总金额作为单价（套餐计费）
+            amountDetail.setOvertimeRate(1.0);
+
+            log.info("使用订单累加费用: tableId={}, finalAmount={}", tableId, finalAmount);
+        } else {
+            // 订单中没有费用，重新计算
+            amountDetail = billingService.calculateAmount(actualDuration, table.getPresetDuration());
+            log.info("重新计算费用: tableId={}, amount={}", tableId, amountDetail.getTotalAmount());
+        }
+
         response.setAmountDetail(amountDetail);
+
+        // 设置原价（如果有会员，originalAmount是折扣前的价格）
+        if (order.getOriginalAmount() != null && order.getOriginalAmount().doubleValue() > 0) {
+            response.setOriginalAmount(order.getOriginalAmount());
+        } else {
+            response.setOriginalAmount(java.math.BigDecimal.valueOf(amountDetail.getTotalAmount()));
+        }
+
+        // 填充会员信息
+        if (order.getMemberId() != null) {
+            try {
+                com.pindou.timer.entity.Member member = memberService.getById(order.getMemberId());
+                if (member != null) {
+                    MemberInfo memberInfo = new MemberInfo();
+                    memberInfo.setId(member.getId());
+                    memberInfo.setName(member.getName());
+                    memberInfo.setLevelName(getMemberLevelName(member.getLevelId()));
+                    memberInfo.setDiscountRate(getMemberDiscountRate(member.getLevelId()));
+
+                    // 计算折扣金额
+                    double originalAmount = response.getOriginalAmount().doubleValue();
+                    double finalAmount = amountDetail.getTotalAmount();
+                    double discountAmount = originalAmount - finalAmount;
+
+                    memberInfo.setDiscountAmount(java.math.BigDecimal.valueOf(discountAmount));
+                    memberInfo.setFinalAmount(java.math.BigDecimal.valueOf(finalAmount));
+
+                    response.setMember(memberInfo);
+                    log.info("会员信息: memberId={}, levelName={}, discountRate={}, originalAmount={}, discountAmount={}, finalAmount={}",
+                            member.getId(), memberInfo.getLevelName(), memberInfo.getDiscountRate(),
+                            originalAmount, discountAmount, finalAmount);
+                }
+            } catch (Exception e) {
+                log.warn("获取会员信息失败: {}", e.getMessage());
+            }
+        }
 
         log.info("获取桌台账单成功: tableId={}, amount={}", tableId, amountDetail.getTotalAmount());
         return response;
+    }
+
+    /**
+     * 获取会员等级名称
+     */
+    private String getMemberLevelName(Long levelId) {
+        if (levelId == null) return "普通会员";
+        try {
+            com.pindou.timer.entity.MemberLevel level = memberLevelService.getById(levelId);
+            return level != null ? level.getName() : "普通会员";
+        } catch (Exception e) {
+            return "普通会员";
+        }
+    }
+
+    /**
+     * 获取会员折扣率
+     */
+    private java.math.BigDecimal getMemberDiscountRate(Long levelId) {
+        if (levelId == null) return java.math.BigDecimal.ONE;
+        try {
+            com.pindou.timer.entity.MemberLevel level = memberLevelService.getById(levelId);
+            return level != null && level.getDiscountRate() != null
+                    ? level.getDiscountRate()
+                    : java.math.BigDecimal.ONE;
+        } catch (Exception e) {
+            return java.math.BigDecimal.ONE;
+        }
     }
 
     @Override
@@ -561,9 +847,12 @@ public class TableServiceImpl implements TableService {
         // 设置创建时间
         response.setCreatedAt(table.getCreatedAt());
 
-        // 计算到点时间（开始时间 + 预设时长）
+        // 计算到点时间（开始时间 + 预设时长 + 延长时间）
         if (table.getStartTime() != null && table.getPresetDuration() != null) {
-            long endTime = table.getStartTime() + table.getPresetDuration() * 1000L;
+            // 获取延长时间配置（分钟），默认30分钟
+            int extendTimeMinutes = getExtendTimeConfig();
+            long baseEndTime = table.getStartTime() + table.getPresetDuration() * 1000L;
+            long endTime = baseEndTime + extendTimeMinutes * 60 * 1000L;
             response.setEndTime(endTime);
         }
 
@@ -584,10 +873,65 @@ public class TableServiceImpl implements TableService {
             response.setDuration(duration);
             response.setPauseDuration(pauseDuration);
 
-            // 计算费用（简单按分钟计费）
-            double hours = duration / 3600.0;
-            double amount = hours * DEFAULT_HOURLY_RATE;
-            response.setAmount(Math.round(amount * 100.0) / 100.0); // 保留两位小数
+            // 优先使用订单中存储的累加费用，如果没有则使用计费规则计算
+            if (table.getCurrentOrderId() != null) {
+                Order currentOrder = orderMapper.selectById(table.getCurrentOrderId());
+
+                // 打印日志用于调试
+                log.info("convertToResponse订单金额: orderId={}, amount={}, originalAmount={}",
+                    currentOrder.getId(), currentOrder.getAmount(), currentOrder.getOriginalAmount());
+
+                if (currentOrder != null && currentOrder.getAmount() != null && currentOrder.getAmount().doubleValue() > 0) {
+                    response.setAmount(currentOrder.getAmount().doubleValue());
+
+                    // 设置原价
+                    if (currentOrder.getOriginalAmount() != null && currentOrder.getOriginalAmount().doubleValue() > 0) {
+                        response.setOriginalAmount(currentOrder.getOriginalAmount().doubleValue());
+                    }
+
+                    log.info("使用订单累加费用作为当前费用: tableId={}, amount={}, originalAmount={}",
+                        table.getId(), currentOrder.getAmount().doubleValue(), response.getOriginalAmount());
+
+                    // 填充会员信息
+                    if (currentOrder.getMemberId() != null) {
+                        try {
+                            Member member = memberService.getById(currentOrder.getMemberId());
+                            if (member != null) {
+                                response.setMemberName(member.getName());
+
+                                // 获取会员等级信息
+                                if (member.getLevelId() != null) {
+                                    MemberLevel memberLevel = memberLevelService.getById(member.getLevelId());
+                                    if (memberLevel != null && memberLevel.getDiscountRate() != null) {
+                                        response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("获取会员信息失败: {}", e.getMessage());
+                        }
+                    }
+                } else {
+                    // 如果订单中没有存储费用，则使用计费规则计算（初次计费）
+                    AmountDetail amountDetail = billingService.calculateAmount((int) duration, table.getPresetDuration());
+                    response.setAmount(amountDetail.getTotalAmount());
+                    response.setOriginalAmount(amountDetail.getTotalAmount());
+
+                    // 更新订单费用
+                    currentOrder.setAmount(BigDecimal.valueOf(amountDetail.getTotalAmount()));
+                    currentOrder.setOriginalAmount(BigDecimal.valueOf(amountDetail.getTotalAmount()));
+                    currentOrder.setUpdatedAt(System.currentTimeMillis());
+                    orderMapper.updateById(currentOrder);
+
+                    log.info("初次计费并设置到订单: tableId={}, amount={}", table.getId(), amountDetail.getTotalAmount());
+                }
+            } else {
+                // 没有订单时，使用计费规则计算
+                AmountDetail amountDetail = billingService.calculateAmount((int) duration, table.getPresetDuration());
+                response.setAmount(amountDetail.getTotalAmount());
+                response.setOriginalAmount(amountDetail.getTotalAmount());
+                log.info("无订单，重新计算费用: tableId={}, amount={}", table.getId(), amountDetail.getTotalAmount());
+            }
         } else {
             response.setDuration(0L);
             response.setPauseDuration(0L);
@@ -595,5 +939,24 @@ public class TableServiceImpl implements TableService {
         }
 
         return response;
+    }
+
+    /**
+     * 获取延长时间配置（分钟）
+     */
+    private int getExtendTimeConfig() {
+        try {
+            String configStr = configService.getSystemConfig();
+            if (configStr != null && !configStr.isEmpty()) {
+                JSONObject config = JSONUtil.parseObj(configStr);
+                Integer extendTime = config.getInt("extendTime");
+                if (extendTime != null && extendTime > 0) {
+                    return extendTime;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取延长时间配置失败，使用默认值: {}", e.getMessage());
+        }
+        return 30; // 默认30分钟
     }
 }

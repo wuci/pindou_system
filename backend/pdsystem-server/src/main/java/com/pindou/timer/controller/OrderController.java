@@ -33,16 +33,19 @@ public class OrderController {
     }
 
     /**
-     * 获取当前进行中的订单列表
+     * 获取当天已完成的订单列表（分页）
      */
-    @Operation(summary = "获取当前订单列表")
+    @Operation(summary = "获取当天已完成订单列表")
     @GetMapping("/active")
-    public Result<List<OrderInfoResponse>> getActiveOrders() {
-        log.info("获取当前订单列表请求");
+    public Result<PageResult<OrderInfoResponse>> getActiveOrders(
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
 
-        List<OrderInfoResponse> orders = orderService.getActiveOrders();
+        log.info("获取当天已完成订单列表请求: page={}, pageSize={}", page, pageSize);
 
-        return Result.success(orders);
+        PageResult<OrderInfoResponse> result = orderService.getActiveOrders(page, pageSize);
+
+        return Result.success(result);
     }
 
     /**
@@ -53,7 +56,7 @@ public class OrderController {
     public Result<PageResult<OrderInfoResponse>> getHistoryOrders(
             @RequestParam(required = false, defaultValue = "1") Integer page,
             @RequestParam(required = false, defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false, defaultValue = "completed") String status,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) Integer tableId,
             @RequestParam(required = false) Long startTime,
             @RequestParam(required = false) Long endTime,

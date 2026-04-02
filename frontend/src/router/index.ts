@@ -90,6 +90,26 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'members',
+        name: 'MemberManagement',
+        component: () => import('@/views/MemberManagement/index.vue'),
+        meta: {
+          title: '会员管理',
+          icon: 'User',
+          permission: 'member:view'
+        }
+      },
+      {
+        path: 'member-levels',
+        name: 'MemberLevelManagement',
+        component: () => import('@/views/MemberLevelManagement/index.vue'),
+        meta: {
+          title: '会员等级',
+          icon: 'Star',
+          permission: 'member:level'
+        }
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/Settings/index.vue'),

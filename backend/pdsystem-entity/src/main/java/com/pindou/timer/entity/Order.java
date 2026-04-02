@@ -53,6 +53,10 @@ public class Order implements Serializable {
     @TableField("preset_duration")
     private Integer presetDuration;
 
+    @Schema(description = "订餐渠道")
+    @TableField("channel")
+    private String channel;
+
     @Schema(description = "状态：active-进行中 completed-已完成")
     @TableField("status")
     private String status;
@@ -72,6 +76,14 @@ public class Order implements Serializable {
     @Schema(description = "操作员姓名")
     @TableField("operator_name")
     private String operatorName;
+
+    @Schema(description = "会员ID")
+    @TableField("member_id")
+    private Long memberId;
+
+    @Schema(description = "原价（折扣前）")
+    @TableField("original_amount")
+    private BigDecimal originalAmount;
 
     @Schema(description = "支付时间（毫秒时间戳）")
     @TableField("paid_at")

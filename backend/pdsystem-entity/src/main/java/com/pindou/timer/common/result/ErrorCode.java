@@ -48,7 +48,17 @@ public enum ErrorCode {
 
     // ========== 配置相关错误码 40xxx ==========
     CONFIG_NOT_FOUND(40001, "配置不存在"),
-    CONFIG_UPDATE_FAILED(40002, "配置更新失败");
+    CONFIG_UPDATE_FAILED(40002, "配置更新失败"),
+
+    // ========== 会员相关错误码 50xxx ==========
+    MEMBER_NOT_FOUND(50001, "会员不存在"),
+    MEMBER_PHONE_EXISTS(50002, "手机号已存在"),
+
+    // ========== 会员等级相关错误码 51xxx ==========
+    MEMBER_LEVEL_NOT_FOUND(51001, "会员等级不存在"),
+    MEMBER_LEVEL_NAME_EXISTS(51002, "会员等级名称已存在"),
+    MEMBER_LEVEL_IN_USE(51003, "会员等级正在使用中，无法删除"),
+    MEMBER_LEVEL_DEFAULT(51004, "默认会员等级不能删除");
 
     /**
      * 状态码

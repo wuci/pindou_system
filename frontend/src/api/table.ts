@@ -15,10 +15,13 @@ export interface TableInfo {
   pauseDuration: number
   presetDuration: number | null
   amount: number
+  originalAmount?: number  // 原价（折扣前）
   reminded: number
   remindIgnored: number
   createdAt: number | null
   endTime: number | null
+  memberName?: string  // 会员姓名
+  memberDiscountRate?: number  // 会员折扣率
 }
 
 /**
@@ -26,6 +29,8 @@ export interface TableInfo {
  */
 export interface StartTableParams {
   presetDuration: number | null
+  channel?: string  // 订餐渠道
+  memberId?: number  // 会员ID
   remark?: string
 }
 
@@ -34,6 +39,18 @@ export interface StartTableParams {
  */
 export interface PauseTableParams {
   remark?: string
+}
+
+/**
+ * 会员信息（账单用）
+ */
+export interface BillMemberInfo {
+  id: number
+  name: string
+  levelName: string
+  discountRate: number
+  discountAmount: number
+  finalAmount: number
 }
 
 /**
@@ -51,11 +68,13 @@ export interface BillInfo {
   presetDuration: number | null
   operatorName: string
   status: string
+  originalAmount?: number  // 原价（折扣前）
   amountDetail?: {
     normalAmount: number
     overtimeAmount: number
     totalAmount: number
   }
+  member?: BillMemberInfo  // 会员信息
 }
 
 /**
@@ -103,10 +122,17 @@ export const resumeTable = (id: number) => {
 }
 
 /**
+ * 结账参数
+ */
+export interface EndTableParams {
+  memberId?: number | null
+}
+
+/**
  * 结束结账
  */
-export const endTable = (id: number) => {
-  return http.post(`/tables/${id}/end`)
+export const endTable = (id: number, data?: EndTableParams) => {
+  return http.post(`/tables/${id}/end`, data || {})
 }
 
 /**
@@ -135,4 +161,28 @@ export const deleteTable = (id: number) => {
  */
 export const batchDeleteTables = (tableIds: number[]) => {
   return http.delete('/tables/batch', { data: { tableIds } })
+}
+
+/**
+ * 续费参数
+ */
+export interface ExtendTableParams {
+  additionalDuration: number  // 额外时长（秒）
+  channel?: string  // 订餐渠道
+}
+
+/**
+ * 续费时长规则
+ */
+export interface ExtendRule {
+  unlimited: boolean
+  minutes?: number
+  price?: number
+}
+
+/**
+ * 续费时长
+ */
+export const extendTable = (id: number, data: ExtendTableParams) => {
+  return http.post(`/tables/${id}/extend`, data)
 }

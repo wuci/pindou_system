@@ -66,6 +66,7 @@
       @pause="handlePause"
       @resume="handleResume"
       @end="handleEnd"
+      @extend="handleExtend"
       @ignoreRemind="handleIgnoreRemind"
       @refresh="refreshTables"
       @edit="handleEdit"
@@ -85,6 +86,13 @@
       v-model="showBillDialog"
       :table-id="selectedTable?.id ?? null"
       @confirmed="refreshTables"
+    />
+
+    <!-- 续费对话框 -->
+    <ExtendDialog
+      v-model="showExtendDialog"
+      :table="selectedTable"
+      @success="refreshTables"
     />
 
     <!-- 桌台配置对话框 -->
@@ -122,6 +130,7 @@ import { getCategories, type TableCategoryResponse } from '@/api/tableCategory'
 import TableLayoutEditor from '@/components/TableLayoutEditor.vue'
 import StartTimerDialog from '@/components/StartTimerDialog.vue'
 import BillDialog from '@/components/BillDialog.vue'
+import ExtendDialog from '@/components/ExtendDialog.vue'
 import TableConfigDialog from './components/TableConfigDialog.vue'
 import EditTableDialog from './components/EditTableDialog.vue'
 import CategoryDialog from './components/CategoryDialog.vue'
@@ -137,6 +146,7 @@ const selectedTableIds = ref<Set<number>>(new Set())
 const batchSelectionMode = ref(false)
 const showStartDialog = ref(false)
 const showBillDialog = ref(false)
+const showExtendDialog = ref(false)
 const showConfigDialog = ref(false)
 const showEditDialog = ref(false)
 const showCategoryDialog = ref(false)
@@ -203,6 +213,12 @@ const handleResume = async (table: TableInfo) => {
 const handleEnd = (table: TableInfo) => {
   selectedTable.value = table
   showBillDialog.value = true
+}
+
+// 续费
+const handleExtend = (table: TableInfo) => {
+  selectedTable.value = table
+  showExtendDialog.value = true
 }
 
 // 忽略提醒

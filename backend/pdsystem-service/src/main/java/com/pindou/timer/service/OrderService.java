@@ -14,11 +14,13 @@ import java.util.List;
 public interface OrderService {
 
     /**
-     * 获取当前进行中的订单列表
+     * 获取当前进行中的订单列表（分页）
      *
-     * @return 当前订单列表
+     * @param page 页码，从1开始
+     * @param pageSize 每页数量
+     * @return 分页结果
      */
-    List<OrderInfoResponse> getActiveOrders();
+    PageResult<OrderInfoResponse> getActiveOrders(Integer page, Integer pageSize);
 
     /**
      * 获取历史订单列表（分页）

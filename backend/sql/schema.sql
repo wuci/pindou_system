@@ -92,7 +92,7 @@ CREATE TABLE `biz_order` (
   `duration` INT NOT NULL DEFAULT 0 COMMENT '总时长（秒）',
   `pause_duration` INT NOT NULL DEFAULT 0 COMMENT '暂停总时长（秒）',
   `preset_duration` INT DEFAULT NULL COMMENT '预设时长（秒）',
-  `status` VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '状态：active=进行中 completed=已完成',
+  `status` VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '状态：active=进行中 completed=已完成 cancelled=已作废（使用时长<5分钟）',
   `amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '总金额',
   `amount_detail` JSON NOT NULL COMMENT '金额明细',
   `operator_id` VARCHAR(36) DEFAULT NULL COMMENT '操作员ID',

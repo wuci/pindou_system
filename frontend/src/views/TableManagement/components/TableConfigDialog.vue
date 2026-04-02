@@ -169,7 +169,9 @@ const handleSubmit = async () => {
     emit('success')
     handleClose()
   } catch (error) {
-    // 验证失败或请求失败
+    // 显示错误信息
+    const message = error instanceof Error ? error.message : '配置失败，请重试'
+    ElMessage.error(message)
   } finally {
     submitting.value = false
   }

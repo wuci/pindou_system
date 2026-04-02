@@ -44,9 +44,38 @@
         </div>
       </div>
 
+      <!-- 会员信息 -->
+      <div class="bill-section" v-if="bill.member">
+        <h3 class="section-title">会员信息</h3>
+        <div class="info-row">
+          <span class="label">会员姓名</span>
+          <span class="value">{{ bill.member.name }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">会员等级</span>
+          <span class="value">
+            <el-tag type="success" size="small">{{ bill.member.levelName }}</el-tag>
+            <span style="margin-left: 8px;">{{ (bill.member.discountRate * 10).toFixed(1) }}折</span>
+          </span>
+        </div>
+      </div>
+
       <!-- 费用明细 -->
       <div class="bill-section">
         <h3 class="section-title">费用明细</h3>
+
+        <!-- 原价 -->
+        <div class="amount-row" v-if="bill.originalAmount && bill.originalAmount > 0">
+          <span class="label">原价</span>
+          <span class="value original">¥{{ formatMoney(bill.originalAmount) }}</span>
+        </div>
+
+        <!-- 会员优惠 -->
+        <div class="amount-row" v-if="bill.member && bill.member.discountAmount && bill.member.discountAmount > 0">
+          <span class="label">会员优惠</span>
+          <span class="value discount">-¥{{ formatMoney(bill.member.discountAmount) }}</span>
+        </div>
+
         <div class="amount-row">
           <span class="label">正常费用</span>
           <span class="value">¥{{ formatMoney(bill.amountDetail?.normalAmount) }}</span>
@@ -56,7 +85,7 @@
           <span class="value overtime">¥{{ formatMoney(bill.amountDetail?.overtimeAmount) }}</span>
         </div>
         <div class="amount-row total">
-          <span class="label">总计</span>
+          <span class="label">应付金额</span>
           <span class="value total-amount">¥{{ formatMoney(bill.amountDetail?.totalAmount) }}</span>
         </div>
       </div>
@@ -272,6 +301,16 @@ const formatMoney = (amount: number) => {
 
 .amount-row .value.overtime {
   color: #e6a23c;
+}
+
+.amount-row .value.original {
+  color: #909399;
+  text-decoration: line-through;
+}
+
+.amount-row .value.discount {
+  color: #67c23a;
+  font-weight: 600;
 }
 
 .amount-row.total {

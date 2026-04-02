@@ -3,10 +3,12 @@ package com.pindou.timer.controller;
 import com.pindou.timer.common.result.Result;
 import com.pindou.timer.dto.BillingRuleConfigRequest;
 import com.pindou.timer.dto.RemindConfigRequest;
+import com.pindou.timer.dto.SystemConfigRequest;
 import com.pindou.timer.service.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -114,6 +116,32 @@ public class ConfigController {
         log.info("更新桌台数量配置请求: count={}", count);
 
         Boolean result = configService.updateTableCountConfig(count);
+
+        return Result.success(result);
+    }
+
+    /**
+     * 获取系统参数配置
+     */
+    @Operation(summary = "获取系统参数配置")
+    @GetMapping("/system")
+    public Result<String> getSystemConfig() {
+        log.info("获取系统参数配置请求");
+
+        String config = configService.getSystemConfig();
+
+        return Result.success(config);
+    }
+
+    /**
+     * 更新系统参数配置
+     */
+    @Operation(summary = "更新系统参数配置")
+    @PutMapping("/system")
+    public Result<Boolean> updateSystemConfig(@Validated @RequestBody SystemConfigRequest request) {
+        log.info("更新系统参数配置请求: request={}", request);
+
+        Boolean result = configService.updateSystemConfig(request);
 
         return Result.success(result);
     }

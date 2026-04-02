@@ -72,6 +72,14 @@
               <el-icon><Tickets /></el-icon>
               <span>操作日志</span>
             </el-menu-item>
+            <el-menu-item index="/members">
+              <el-icon><User /></el-icon>
+              <span>会员管理</span>
+            </el-menu-item>
+            <el-menu-item index="/member-levels">
+              <el-icon><Star /></el-icon>
+              <span>会员等级</span>
+            </el-menu-item>
             <el-menu-item index="/settings" v-if="hasPermission('system:config')">
               <el-icon><Setting /></el-icon>
               <span>系统设置</span>
@@ -102,7 +110,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useWebSocketStore } from '@/stores/websocket'
 import { ElMessageBox } from 'element-plus'
-import { Bell } from '@element-plus/icons-vue'
+import { Bell, Star } from '@element-plus/icons-vue'
 import RemindPanel from '@/components/RemindPanel.vue'
 
 const router = useRouter()

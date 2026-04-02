@@ -24,6 +24,12 @@ public class StartTimerRequest implements Serializable {
     @Min(value = 0, message = "预设时长不能小于0")
     private Integer presetDuration;
 
+    @Schema(description = "订餐渠道", example = "store")
+    private String channel;
+
+    @Schema(description = "会员ID")
+    private Long memberId;
+
     @Schema(description = "备注", example = "会员客户")
     private String note;
 }

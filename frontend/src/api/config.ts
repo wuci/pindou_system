@@ -4,16 +4,18 @@ import { http } from '@/utils/request'
  * 单条计费规则
  */
 export interface BillingRuleItem {
-  hours: number | null  // 时长（小时），null表示不限时
-  price: number  // 价格（元）
+  minutes: number | null  // 时长（分钟），null表示不限时
+  price: number  // 价格（元），保留两位小数
   unlimited: boolean  // 是否不限时
+  hours?: number  // UI辅助字段：小时（0-23）
+  minutes_ui?: number  // UI辅助字段：分钟（0-59）
 }
 
 /**
  * 渠道计费规则
  */
 export interface ChannelBillingRule {
-  channel: 'store' | 'meituan' | 'dianping'  // 渠道代码
+  channel: string  // 渠道代码
   channelName: string  // 渠道名称
   rules: BillingRuleItem[]  // 计费规则列表
 }
@@ -44,6 +46,10 @@ export interface SystemConfig {
   billingRule: BillingRule
   remindConfig: RemindConfig
   sessionTimeout: number
+  extendTime: number
+  invalidOrderTime: number
+  maxExtendCount: number
+  autoSettleTime: number
 }
 
 /**
@@ -64,7 +70,7 @@ export const getConfig = () => {
  * 获取计费规则配置
  */
 export const getBillingRuleConfig = () => {
-  return http.get<BillingRule>('/config/billing')
+  return http.get<string>('/config/billing')
 }
 
 /**
@@ -102,4 +108,18 @@ export const updateTableCountConfig = (count: number) => {
   return http.put<boolean>('/config/table-count', null, {
     params: { count }
   })
+}
+
+/**
+ * 获取系统参数配置
+ */
+export const getSystemConfig = () => {
+  return http.get<string>('/config/system')
+}
+
+/**
+ * 更新系统参数配置
+ */
+export const updateSystemConfig = (data: Partial<SystemConfig>) => {
+  return http.put<boolean>('/config/system', data)
 }

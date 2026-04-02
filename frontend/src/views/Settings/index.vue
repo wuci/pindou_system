@@ -5,20 +5,45 @@
         <!-- 计费规则 -->
         <el-tab-pane label="计费规则" name="billing">
           <div class="tab-content">
-            <!-- 渠道选择 -->
+            <!-- 渠道选择和管理 -->
             <div class="channel-tabs">
               <el-radio-group v-model="activeChannel" @change="handleChannelChange">
-                <el-radio-button value="store">店内</el-radio-button>
-                <el-radio-button value="meituan">美团</el-radio-button>
-                <el-radio-button value="dianping">大众点评</el-radio-button>
+                <el-radio-button
+                  v-for="channel in billingData.channels"
+                  :key="channel.channel"
+                  :value="channel.channel"
+                >
+                  {{ channel.channelName }}
+                </el-radio-button>
               </el-radio-group>
+              <el-button
+                type="primary"
+                :icon="Plus"
+                size="small"
+                @click="showAddChannelDialog"
+                style="margin-left: 12px"
+              >
+                添加渠道
+              </el-button>
+              <el-button
+                v-if="billingData.channels.length > 1"
+                type="danger"
+                :icon="Delete"
+                size="small"
+                @click="handleDeleteChannel"
+              >
+                删除渠道
+              </el-button>
             </div>
 
             <!-- 规则列表 -->
             <div class="rules-section">
               <div class="section-header">
                 <h3>{{ getChannelName(activeChannel) }}计费规则</h3>
-                <el-button type="primary" :icon="Plus" @click="addRule">添加规则</el-button>
+                <div class="header-actions">
+                  <el-button type="success" :icon="Sort" @click="autoSortRules">自动排序</el-button>
+                  <el-button type="primary" :icon="Plus" @click="addRule">添加规则</el-button>
+                </div>
               </div>
 
               <div class="rules-list">
@@ -28,16 +53,27 @@
                   class="rule-item"
                 >
                   <div class="rule-content">
-                    <div class="rule-hours">
+                    <div class="rule-time">
                       <el-input-number
                         v-model="rule.hours"
-                        :min="1"
-                        :max="24"
+                        :min="0"
+                        :max="23"
                         :disabled="rule.unlimited"
-                        placeholder="时长"
-                        style="width: 120px"
+                        placeholder="0"
+                        style="width: 100px"
+                        @change="calculateTotalMinutes(rule)"
                       />
                       <span class="unit">小时</span>
+                      <el-input-number
+                        v-model="rule.minutes_ui"
+                        :min="0"
+                        :max="59"
+                        :disabled="rule.unlimited"
+                        placeholder="分钟"
+                        style="width: 100px"
+                        @change="calculateTotalMinutes(rule)"
+                      />
+                      <span class="unit">分钟</span>
                       <el-checkbox v-model="rule.unlimited" @change="handleUnlimitedChange(rule, index)">
                         不限时
                       </el-checkbox>
@@ -45,9 +81,10 @@
                     <div class="rule-price">
                       <el-input-number
                         v-model="rule.price"
-                        :min="1"
-                        :max="999"
-                        :precision="0"
+                        :min="0.01"
+                        :max="999.99"
+                        :precision="2"
+                        :step="0.5"
                         placeholder="价格"
                         style="width: 120px"
                       />
@@ -59,11 +96,30 @@
                   </div>
                   <div class="rule-actions">
                     <el-button
+                      type="primary"
+                      :icon="Top"
+                      size="small"
+                      circle
+                      :disabled="index === 0"
+                      @click="moveRuleUp(index)"
+                      title="上移"
+                    />
+                    <el-button
+                      type="primary"
+                      :icon="Bottom"
+                      size="small"
+                      circle
+                      :disabled="index === currentChannelRules.length - 1"
+                      @click="moveRuleDown(index)"
+                      title="下移"
+                    />
+                    <el-button
                       type="danger"
                       :icon="Delete"
                       size="small"
                       circle
                       @click="removeRule(index)"
+                      title="删除"
                     />
                   </div>
                 </div>
@@ -163,52 +219,150 @@
           </div>
         </el-tab-pane>
 
+        <!-- 系统参数配置 -->
+        <el-tab-pane label="系统参数配置" name="system">
+          <div class="tab-content">
+            <el-form
+              ref="systemFormRef"
+              :model="systemForm"
+              :rules="systemRules"
+              label-width="140px"
+              style="max-width: 600px"
+            >
+              <el-form-item label="延长时间" prop="extendTime">
+                <el-input-number
+                  v-model="systemForm.extendTime"
+                  :min="1"
+                  :max="120"
+                  :step="1"
+                  style="width: 200px"
+                />
+                <span class="unit">分钟</span>
+                <div class="form-tip">桌台超时后可延长的使用时间</div>
+              </el-form-item>
+
+              <el-form-item label="无效订单时间" prop="invalidOrderTime">
+                <el-input-number
+                  v-model="systemForm.invalidOrderTime"
+                  :min="0"
+                  :max="60"
+                  :step="1"
+                  style="width: 200px"
+                />
+                <span class="unit">分钟</span>
+                <div class="form-tip">几分钟内结束的订单视为无效订单，0表示不限制</div>
+              </el-form-item>
+
+              <el-form-item>
+                <el-alert
+                  title="参数说明"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                >
+                  <template #default>
+                    <div>• 延长时间：桌台使用超时后，可以延长的使用时间</div>
+                    <div>• 无效订单时间：几分钟内结束的订单视为无效订单，不计入统计</div>
+                  </template>
+                </el-alert>
+              </el-form-item>
+
+              <el-form-item>
+                <el-button type="primary" :loading="systemSaving" @click="saveSystemConfig">
+                  保存配置
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+        </el-tab-pane>
+
       </el-tabs>
     </el-card>
+
+    <!-- 添加渠道对话框 -->
+    <el-dialog
+      v-model="addChannelDialogVisible"
+      title="添加渠道"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="addChannelFormRef" :model="addChannelForm" :rules="addChannelRules" label-width="100px">
+        <el-form-item label="渠道代码" prop="channel">
+          <el-input
+            v-model="addChannelForm.channel"
+            placeholder="请输入渠道代码，如: store"
+            maxlength="20"
+            show-word-limit
+          />
+          <div class="form-tip">渠道代码是唯一标识，只能包含字母、数字和下划线</div>
+        </el-form-item>
+        <el-form-item label="渠道名称" prop="channelName">
+          <el-input
+            v-model="addChannelForm.channelName"
+            placeholder="请输入渠道名称，如: 店内"
+            maxlength="20"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addChannelDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleAddChannel">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { Plus, Delete, Top, Bottom, Sort } from '@element-plus/icons-vue'
 import {
   getBillingRuleConfig,
   updateBillingRule,
   getRemindConfig,
   updateRemindConfig,
+  getSystemConfig,
+  updateSystemConfig,
   type BillingRule,
   type ChannelBillingRule,
   type BillingRuleItem,
-  type RemindConfig
+  type RemindConfig,
+  type SystemConfig
 } from '@/api/config'
 
 // 当前激活的标签
 const activeTab = ref('billing')
 
 // 计费规则相关
-const activeChannel = ref<'store' | 'meituan' | 'dianping'>('store')
+const activeChannel = ref<string>('store')
 const billingSaving = ref(false)
+
+// 添加渠道对话框
+const addChannelDialogVisible = ref(false)
+const addChannelFormRef = ref<FormInstance>()
+const addChannelForm = reactive({
+  channel: '',
+  channelName: ''
+})
+
+const addChannelRules: FormRules = {
+  channel: [
+    { required: true, message: '请输入渠道代码', trigger: 'blur' },
+    {
+      pattern: /^[a-zA-Z0-9_]+$/,
+      message: '渠道代码只能包含字母、数字和下划线',
+      trigger: 'blur'
+    }
+  ],
+  channelName: [
+    { required: true, message: '请输入渠道名称', trigger: 'blur' }
+  ]
+}
 
 // 计费规则数据结构
 const billingData = reactive<BillingRule>({
-  channels: [
-    {
-      channel: 'store',
-      channelName: '店内',
-      rules: []
-    },
-    {
-      channel: 'meituan',
-      channelName: '美团',
-      rules: []
-    },
-    {
-      channel: 'dianping',
-      channelName: '大众点评',
-      rules: []
-    }
-  ]
+  channels: []
 })
 
 // 当前渠道的规则
@@ -218,29 +372,117 @@ const currentChannelRules = computed(() => {
 })
 
 // 获取渠道名称
-const getChannelName = (channel: string): string => {
-  const names: Record<string, string> = {
-    store: '店内',
-    meituan: '美团',
-    dianping: '大众点评'
+const getChannelName = (channelCode: string): string => {
+  const channel = billingData.channels.find(c => c.channel === channelCode)
+  return channel?.channelName || channelCode
+}
+
+// 显示添加渠道对话框
+const showAddChannelDialog = () => {
+  addChannelForm.channel = ''
+  addChannelForm.channelName = ''
+  addChannelDialogVisible.value = true
+}
+
+// 添加渠道
+const handleAddChannel = async () => {
+  if (!addChannelFormRef.value) return
+
+  try {
+    await addChannelFormRef.value.validate()
+
+    // 检查渠道代码是否已存在
+    const exists = billingData.channels.some(c => c.channel === addChannelForm.channel)
+    if (exists) {
+      ElMessage.warning('渠道代码已存在')
+      return
+    }
+
+    // 添加新渠道
+    billingData.channels.push({
+      channel: addChannelForm.channel,
+      channelName: addChannelForm.channelName,
+      rules: []
+    })
+
+    // 切换到新渠道
+    activeChannel.value = addChannelForm.channel
+
+    ElMessage.success('渠道添加成功')
+    addChannelDialogVisible.value = false
+  } catch (error) {
+    // 验证失败
   }
-  return names[channel] || channel
+}
+
+// 删除渠道
+const handleDeleteChannel = () => {
+  if (billingData.channels.length <= 1) {
+    ElMessage.warning('至少需要保留一个渠道')
+    return
+  }
+
+  const currentChannelIndex = billingData.channels.findIndex(c => c.channel === activeChannel.value)
+  const currentChannelData = billingData.channels[currentChannelIndex]
+
+  ElMessageBox.confirm(
+    `确定要删除"${currentChannelData.channelName}"渠道吗？删除后该渠道的计费规则也将被删除。`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    billingData.channels.splice(currentChannelIndex, 1)
+
+    // 切换到第一个渠道
+    if (billingData.channels.length > 0) {
+      activeChannel.value = billingData.channels[0].channel
+    }
+
+    ElMessage.success('渠道删除成功')
+  }).catch(() => {
+    // 取消删除
+  })
 }
 
 // 格式化规则显示
 const formatRuleDisplay = (rule: BillingRuleItem): string => {
   if (rule.unlimited) {
-    return `不限时 ${rule.price}元`
+    return `不限时 ${rule.price.toFixed(2)}元`
   }
-  return `${rule.hours}小时 ${rule.price}元`
+
+  const totalMinutes = rule.minutes || 0
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}小时${minutes}分钟 ${rule.price.toFixed(2)}元`
+  } else if (hours > 0) {
+    return `${hours}小时 ${rule.price.toFixed(2)}元`
+  } else {
+    return `${minutes}分钟 ${rule.price.toFixed(2)}元`
+  }
 }
 
 // 处理不限时变化
 const handleUnlimitedChange = (rule: BillingRuleItem, index: number) => {
   if (rule.unlimited) {
-    rule.hours = null
+    rule.minutes = null
+    rule.hours = 0
+    rule.minutes_ui = 0
   } else {
-    rule.hours = rule.hours || 1
+    rule.minutes = rule.minutes || 60
+    rule.hours = Math.floor((rule.minutes || 60) / 60)
+    rule.minutes_ui = (rule.minutes || 60) % 60
+  }
+}
+
+// 监听小时和分钟变化，自动计算总分钟数
+const calculateTotalMinutes = (rule: BillingRuleItem) => {
+  if (!rule.unlimited && rule.hours !== undefined && rule.minutes_ui !== undefined) {
+    rule.minutes = rule.hours * 60 + rule.minutes_ui
   }
 }
 
@@ -249,7 +491,9 @@ const addRule = () => {
   const channel = billingData.channels.find(c => c.channel === activeChannel.value)
   if (channel) {
     channel.rules.push({
+      minutes: 60,
       hours: 1,
+      minutes_ui: 0,
       price: 19,
       unlimited: false
     })
@@ -264,6 +508,44 @@ const removeRule = (index: number) => {
   }
 }
 
+// 上移规则
+const moveRuleUp = (index: number) => {
+  if (index === 0) return
+  const channel = billingData.channels.find(c => c.channel === activeChannel.value)
+  if (channel) {
+    const [removed] = channel.rules.splice(index, 1)
+    channel.rules.splice(index - 1, 0, removed)
+  }
+}
+
+// 下移规则
+const moveRuleDown = (index: number) => {
+  const channel = billingData.channels.find(c => c.channel === activeChannel.value)
+  if (channel && index < channel.rules.length - 1) {
+    const [removed] = channel.rules.splice(index, 1)
+    channel.rules.splice(index + 1, 0, removed)
+  }
+}
+
+// 自动排序（按时长从小到大，不限时规则排在最后）
+const autoSortRules = () => {
+  const channel = billingData.channels.find(c => c.channel === activeChannel.value)
+  if (channel && channel.rules.length > 1) {
+    channel.rules.sort((a, b) => {
+      // 不限时规则排在最后
+      if (a.unlimited && !b.unlimited) return 1
+      if (!a.unlimited && b.unlimited) return -1
+      if (a.unlimited && b.unlimited) return 0
+
+      // 按时长从小到大排序
+      const aMinutes = a.minutes || 0
+      const bMinutes = b.minutes || 0
+      return aMinutes - bMinutes
+    })
+    ElMessage.success('已按时长自动排序')
+  }
+}
+
 // 渠道切换
 const handleChannelChange = () => {
   // 切换渠道时不需要特殊处理，computed会自动更新
@@ -272,9 +554,37 @@ const handleChannelChange = () => {
 // 加载计费规则配置
 const loadBillingConfig = async () => {
   try {
-    const config = await getBillingRuleConfig()
+    const configStr = await getBillingRuleConfig()
+    const config = JSON.parse(configStr)
     if (config && config.channels && config.channels.length > 0) {
-      billingData.channels = config.channels
+      // 转换数据格式，添加 UI 辅助字段
+      billingData.channels = config.channels.map((channel: ChannelBillingRule) => ({
+        ...channel,
+        rules: channel.rules.map((rule: BillingRuleItem) => {
+          if (rule.unlimited) {
+            return {
+              ...rule,
+              hours: 0,
+              minutes_ui: 0
+            }
+          }
+          const totalMinutes = rule.minutes || 0
+          return {
+            ...rule,
+            hours: Math.floor(totalMinutes / 60),
+            minutes_ui: totalMinutes % 60
+          }
+        })
+      }))
+
+      // 设置当前选中的渠道
+      if (billingData.channels.length > 0) {
+        // 如果当前选中的渠道不存在，切换到第一个渠道
+        const currentExists = billingData.channels.some(c => c.channel === activeChannel.value)
+        if (!currentExists) {
+          activeChannel.value = billingData.channels[0].channel
+        }
+      }
     } else {
       // 使用默认值
       setDefaultRules()
@@ -288,15 +598,20 @@ const loadBillingConfig = async () => {
 // 设置默认规则
 const setDefaultRules = () => {
   const defaultRules = [
-    { hours: 1, price: 19, unlimited: false },
-    { hours: 2, price: 35, unlimited: false },
-    { hours: 4, price: 54, unlimited: false },
-    { hours: null, price: 68, unlimited: true }
+    { minutes: 60, hours: 1, minutes_ui: 0, price: 19, unlimited: false },
+    { minutes: 120, hours: 2, minutes_ui: 0, price: 35, unlimited: false },
+    { minutes: 240, hours: 4, minutes_ui: 0, price: 54, unlimited: false },
+    { minutes: null, hours: 0, minutes_ui: 0, price: 68, unlimited: true }
   ]
 
-  billingData.channels.forEach(channel => {
-    channel.rules = JSON.parse(JSON.stringify(defaultRules))
-  })
+  const defaultChannels = [
+    { channel: 'store', channelName: '店内', rules: JSON.parse(JSON.stringify(defaultRules)) },
+    { channel: 'meituan', channelName: '美团', rules: JSON.parse(JSON.stringify(defaultRules)) },
+    { channel: 'dianping', channelName: '大众点评', rules: JSON.parse(JSON.stringify(defaultRules)) }
+  ]
+
+  billingData.channels = defaultChannels
+  activeChannel.value = 'store'
 }
 
 // 保存计费规则配置
@@ -309,11 +624,14 @@ const saveBillingRule = async () => {
     }
 
     for (const rule of channel.rules) {
-      if (!rule.unlimited && (!rule.hours || rule.hours < 1)) {
-        ElMessage.warning(`${channel.channelName}的规则时长必须大于0小时`)
-        return
+      if (!rule.unlimited) {
+        const totalMinutes = rule.minutes || 0
+        if (totalMinutes < 1) {
+          ElMessage.warning(`${channel.channelName}的规则时长必须大于0分钟`)
+          return
+        }
       }
-      if (!rule.price || rule.price < 1) {
+      if (!rule.price || rule.price < 0.01) {
         ElMessage.warning(`${channel.channelName}的规则价格必须大于0元`)
         return
       }
@@ -322,7 +640,17 @@ const saveBillingRule = async () => {
 
   try {
     billingSaving.value = true
-    await updateBillingRule(billingData)
+    // 构建要发送的数据，移除 UI 辅助字段
+    const dataToSend: BillingRule = {
+      channels: billingData.channels.map(channel => ({
+        ...channel,
+        rules: channel.rules.map(rule => {
+          const { hours, minutes_ui, ...rest } = rule
+          return rest
+        })
+      }))
+    }
+    await updateBillingRule(dataToSend)
     ElMessage.success('保存成功')
   } catch (error) {
     ElMessage.error('保存失败')
@@ -387,10 +715,57 @@ const saveRemindConfig = async () => {
   }
 }
 
+// 系统参数配置表单
+const systemFormRef = ref<FormInstance>()
+const systemSaving = ref(false)
+const systemForm = reactive<SystemConfig>({
+  extendTime: 30,
+  invalidOrderTime: 0,
+  maxExtendCount: 0,
+  autoSettleTime: 0
+})
+
+const systemRules: FormRules = {
+  extendTime: [{ required: true, message: '请输入延长时间', trigger: 'blur' }],
+  invalidOrderTime: [{ required: true, message: '请输入无效订单时间', trigger: 'blur' }]
+}
+
+// 加载系统参数配置
+const loadSystemConfig = async () => {
+  try {
+    const configStr = await getSystemConfig()
+    const config = JSON.parse(configStr)
+    systemForm.extendTime = config.extendTime || 30
+    systemForm.invalidOrderTime = config.invalidOrderTime ?? 0
+  } catch (error) {
+    console.error('加载系统参数配置失败', error)
+  }
+}
+
+// 保存系统参数配置
+const saveSystemConfig = async () => {
+  if (!systemFormRef.value) return
+
+  try {
+    await systemFormRef.value.validate()
+    systemSaving.value = true
+
+    await updateSystemConfig(systemForm)
+    ElMessage.success('保存成功')
+  } catch (error) {
+    if (error !== false) {
+      ElMessage.error('保存失败')
+    }
+  } finally {
+    systemSaving.value = false
+  }
+}
+
 // 生命周期
 onMounted(() => {
   loadBillingConfig()
   loadRemindConfig()
+  loadSystemConfig()
 })
 </script>
 
@@ -426,6 +801,11 @@ onMounted(() => {
   color: #303133;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .rules-list {
   display: flex;
   flex-direction: column;
@@ -449,7 +829,7 @@ onMounted(() => {
   flex: 1;
 }
 
-.rule-hours,
+.rule-time,
 .rule-price {
   display: flex;
   align-items: center;
@@ -457,6 +837,12 @@ onMounted(() => {
 
 .rule-display {
   margin-left: auto;
+}
+
+.rule-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
 }
 
 .display-text {

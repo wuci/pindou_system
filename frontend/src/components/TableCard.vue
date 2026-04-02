@@ -3,8 +3,7 @@
     class="table-card"
     :class="[
       `table-card--${table.status}`,
-      { 'table-card--near-expiry': isNearExpiry && !remindIgnored },
-      { 'table-card--overtime': isOvertime && !remindIgnored }
+      { 'table-card--near-expiry': isNearExpiry && !remindIgnored && !isOvertime }
     ]"
     @click="$emit('click', table)"
   >
@@ -46,22 +45,54 @@
                 <Clock />
               </el-icon>
             </div>
-            <div class="table-card__timer-value">{{ formattedDuration }}</div>
-            <div class="table-card__timer-label">已用时长</div>
+            <div class="table-card__timer-value">{{ formattedRemainingDuration }}</div>
+            <div class="table-card__timer-label">剩余时长</div>
           </div>
 
           <!-- 费用显示 -->
           <div class="table-card__amount">
-            <span class="table-card__amount-value">{{ formattedAmount }}</span>
+            <div v-if="table.originalAmount && table.originalAmount > table.amount" class="table-card__amount-with-original">
+              <span class="table-card__amount-original">¥{{ (table.originalAmount || 0).toFixed(2) }}</span>
+              <span class="table-card__amount-value">¥{{ (table.amount || 0).toFixed(2) }}</span>
+            </div>
+            <div v-else class="table-card__amount-single">
+              <span class="table-card__amount-value">¥{{ (table.amount || 0).toFixed(2) }}</span>
+            </div>
             <span class="table-card__amount-label">当前费用</span>
+            <span v-if="table.memberDiscountRate" class="table-card__member-discount">
+              {{ (table.memberDiscountRate * 10).toFixed(1) }}折
+            </span>
           </div>
         </div>
 
         <!-- 预设时长信息 -->
         <div v-if="table.presetDuration" class="table-card__preset">
+          <!-- 显示已用时长 -->
+          <span class="table-card__remaining">
+            已用：{{ formattedDuration }}
+          </span>
           <span>预设：{{ formatPresetDuration(table.presetDuration) }}</span>
-          <span v-if="remainingDuration !== null" class="table-card__remaining">
-            剩余：{{ formattedRemainingDuration }}
+          <!-- 延长配置：始终显示 -->
+          <span class="table-card__extended">
+            延长：{{ formattedExtendedDuration }}
+          </span>
+          <!-- 超过延长配置时显示真正超时时长 -->
+          <span v-if="isOverExtendedTime" :class="['table-card__overtime']">
+            超时：{{ formattedOvertimeDuration }}
+          </span>
+          <!-- 在延长倒计时时显示剩余延长时长 -->
+          <span v-else-if="isInExtendTime" class="table-card__extend-countdown">
+            延长剩余：{{ formattedExtendRemaining }}
+          </span>
+        </div>
+
+        <!-- 不限时时的延长时长显示 -->
+        <div v-else class="table-card__preset">
+          <span class="table-card__remaining">
+            已用：{{ formattedDuration }}
+          </span>
+          <span class="table-card__extended">
+            延长：{{ formattedExtendedDuration }}
           </span>
         </div>
 
@@ -84,12 +115,9 @@
             <span class="table-card__pause-duration">{{ formattedPauseDuration }}</span>
           </div>
 
-          <div v-if="showRemindStatus" class="table-card__remind">
+          <div v-if="showRemindStatus && !isOvertime" class="table-card__remind">
             <el-tag v-if="isNearExpiry" type="warning" size="small">
               即将到期
-            </el-tag>
-            <el-tag v-else-if="isOvertime" type="danger" size="small">
-              已超时
             </el-tag>
           </div>
         </div>
@@ -107,6 +135,9 @@
         <el-button size="small" @click.stop="$emit('pause', table)">
           暂停
         </el-button>
+        <el-button type="warning" size="small" @click.stop="$emit('extend', table)">
+          续费
+        </el-button>
         <el-button type="success" size="small" @click.stop="$emit('end', table)">
           结账
         </el-button>
@@ -115,6 +146,9 @@
         <el-button type="primary" size="small" @click.stop="$emit('resume', table)">
           继续
         </el-button>
+        <el-button type="warning" size="small" @click.stop="$emit('extend', table)">
+          续费
+        </el-button>
         <el-button type="success" size="small" @click.stop="$emit('end', table)">
           结账
         </el-button>
@@ -122,7 +156,7 @@
     </div>
 
     <!-- 忽略提醒按钮 -->
-    <div v-if="showRemindStatus && !remindIgnored" class="table-card__ignore">
+    <div v-if="showRemindStatus && !remindIgnored && !isOvertime" class="table-card__ignore">
       <el-button text size="small" @click.stop="$emit('ignoreRemind', table)">
         忽略提醒
       </el-button>
@@ -137,9 +171,12 @@ import type { TableInfo } from '@/api/table'
 
 interface Props {
   table: TableInfo
+  systemExtendTime?: number  // 系统配置的延长时间（分钟）
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  systemExtendTime: 30  // 默认30分钟
+})
 
 const emit = defineEmits<{
   click: [table: TableInfo]
@@ -149,6 +186,7 @@ const emit = defineEmits<{
   end: [table: TableInfo]
   ignoreRemind: [table: TableInfo]
   edit: [table: TableInfo]
+  extend: [table: TableInfo]
 }>()
 
 // 状态类型
@@ -227,6 +265,18 @@ const formattedRemainingDuration = computed(() => {
   return formatDuration(remainingDuration.value)
 })
 
+// 计算延长时长配置（秒）- 系统配置的延长时间
+const extendedDuration = computed(() => {
+  // 系统配置的延长时间（分钟转换为秒）
+  const configExtendTimeSeconds = props.systemExtendTime * 60
+  return configExtendTimeSeconds
+})
+
+// 格式化的延长时长显示
+const formattedExtendedDuration = computed(() => {
+  return formatDuration(extendedDuration.value)
+})
+
 // 判断是否即将到期（剩余5分钟）
 const isNearExpiry = computed(() => {
   if (remainingDuration.value === null) {
@@ -235,17 +285,68 @@ const isNearExpiry = computed(() => {
   return remainingDuration.value <= 300 && remainingDuration.value > 0
 })
 
-// 判断是否已超时
+// 判断是否已超时（超过预设时长）
 const isOvertime = computed(() => {
-  if (remainingDuration.value === null) {
+  if (!props.table.presetDuration) {
     return false
   }
-  return remainingDuration.value === 0
+  return props.table.duration > props.table.presetDuration
+})
+
+// 判断是否在延长时间内（超过预设但未超过延长配置）
+const isInExtendTime = computed(() => {
+  if (!props.table.presetDuration) {
+    return false
+  }
+  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
+  return props.table.duration > props.table.presetDuration && props.table.duration <= totalAllowedTime
+})
+
+// 判断是否超过延长配置时间
+const isOverExtendedTime = computed(() => {
+  if (!props.table.presetDuration) {
+    return false
+  }
+  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
+  return props.table.duration > totalAllowedTime
+})
+
+// 计算延长倒计时（延长时间剩余多少秒）
+const extendRemaining = computed(() => {
+  if (!props.table.presetDuration) {
+    return 0
+  }
+  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
+  const remaining = totalAllowedTime - props.table.duration
+  return Math.max(0, remaining)
+})
+
+// 格式化的延长倒计时显示
+const formattedExtendRemaining = computed(() => {
+  return formatDuration(extendRemaining.value)
+})
+
+// 计算真正超时时长（超过预设+延长的部分）
+const overtimeDuration = computed(() => {
+  if (!props.table.presetDuration) {
+    return 0
+  }
+  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
+  if (props.table.duration <= totalAllowedTime) {
+    return 0
+  }
+  // 返回超过延长配置的时长
+  return props.table.duration - totalAllowedTime
+})
+
+// 格式化的超时时长显示
+const formattedOvertimeDuration = computed(() => {
+  return formatDuration(overtimeDuration.value)
 })
 
 // 是否显示提醒状态
 const showRemindStatus = computed(() => {
-  return (isNearExpiry.value || isOvertime.value) && props.table.status !== 'idle'
+  return isNearExpiry.value && !isOvertime.value && props.table.status !== 'idle'
 })
 
 // 提醒是否被忽略
@@ -474,6 +575,25 @@ const formatFullDateTime = (timestamp: number): string => {
   flex: 1;
 }
 
+.table-card__amount-with-original {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.table-card__amount-single {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.table-card__amount-original {
+  font-size: 11px;
+  color: #909399;
+  text-decoration: line-through;
+}
+
 .table-card__amount-value {
   font-size: 20px;
   font-weight: bold;
@@ -483,24 +603,50 @@ const formatFullDateTime = (timestamp: number): string => {
 .table-card__amount-label {
   font-size: 11px;
   color: #909399;
+  margin-top: 2px;
+}
+
+.table-card__member-discount {
+  font-size: 10px;
+  color: #67c23a;
+  font-weight: 500;
+  margin-top: 2px;
 }
 
 /* 预设时长 */
 .table-card__preset {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   font-size: 11px;
   color: #606266;
   background: rgba(0, 0, 0, 0.04);
-  padding: 4px 8px;
+  padding: 6px 8px;
   border-radius: 4px;
   margin-bottom: 6px;
+  min-height: 32px;
 }
 
 .table-card__remaining {
   color: #E6A23C;
   font-weight: 500;
+}
+
+.table-card__extended {
+  color: #909399;
+  font-weight: 500;
+}
+
+.table-card__extend-countdown {
+  color: #E6A23C;
+  font-weight: 500;
+}
+
+.table-card__overtime {
+  color: #F56C6C;
+  font-weight: 600;
 }
 
 /* 时间信息 */

@@ -60,11 +60,29 @@ public class OrderDetailResponse implements Serializable {
     @Schema(description = "超时费用（元）")
     private Double overtimeAmount;
 
+    @Schema(description = "原价（折扣前，元）")
+    private Double originalAmount;
+
     @Schema(description = "操作员ID")
     private String operatorId;
 
     @Schema(description = "操作员姓名")
     private String operatorName;
+
+    @Schema(description = "会员ID")
+    private Long memberId;
+
+    @Schema(description = "会员名称")
+    private String memberName;
+
+    @Schema(description = "会员等级名称")
+    private String memberLevelName;
+
+    @Schema(description = "会员折扣率")
+    private Double memberDiscountRate;
+
+    @Schema(description = "会员信息")
+    private MemberInfo memberInfo;
 
     @Schema(description = "创建时间（毫秒时间戳）")
     private Long createdAt;

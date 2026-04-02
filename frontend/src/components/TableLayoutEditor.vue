@@ -73,10 +73,12 @@
             <div class="table-card" :class="{ 'table-card--selected': localSelectedIds.has(table.id) }">
               <TableCard
                 :table="table"
+                :system-extend-time="extendTime"
                 @start="handleStart"
                 @pause="handlePause"
                 @resume="handleResume"
                 @end="handleEnd"
+                @extend="handleExtend"
                 @ignoreRemind="handleIgnoreRemind"
                 @edit="handleEditTableName"
               />
@@ -165,6 +167,15 @@
             </div>
             <div v-if="table.status !== 'idle'" class="table-element__time">
               {{ formatDuration(table.duration) }}
+              <!-- 显示延长倒计时或超时时长 -->
+              <span v-if="table.presetDuration && table.duration > table.presetDuration" class="table-element__extend-info">
+                <template v-if="table.duration <= table.presetDuration + extendTime * 60">
+                  (+{{ formatDuration(table.presetDuration + extendTime * 60 - table.duration) }})
+                </template>
+                <template v-else>
+                  <span class="table-element__overtime">+{{ formatDuration(table.duration - table.presetDuration - extendTime * 60) }}</span>
+                </template>
+              </span>
             </div>
             <div v-if="table.status !== 'idle'" class="table-element__amount">
               ¥{{ table.amount.toFixed(0) }}
@@ -267,6 +278,7 @@ import TableCard from './TableCard.vue'
 import type { TableInfo } from '@/api/table'
 import { getLayoutConfig, saveLayoutConfig, type TableLayoutItem } from '@/api/tableLayout'
 import { deleteTable, batchDeleteTables, updateTable } from '@/api/table'
+import { getSystemConfig, type SystemConfig } from '@/api/config'
 
 interface LayoutTable extends TableInfo {
   x: number
@@ -301,6 +313,7 @@ const emit = defineEmits<{
   pause: [table: TableInfo]
   resume: [table: TableInfo]
   end: [table: TableInfo]
+  extend: [table: TableInfo]
   ignoreRemind: [table: TableInfo]
   refresh: []
   edit: [table: TableInfo]
@@ -357,6 +370,26 @@ const editNameForm = ref({
 const editNameInputRef = ref()
 const savingName = ref(false)
 const editingNameTable = ref<TableInfo | null>(null)
+
+// 系统配置
+const systemConfig = ref<SystemConfig | null>(null)
+const extendTime = ref(30)  // 默认30分钟
+
+// 加载系统配置
+const loadSystemConfig = async () => {
+  try {
+    const configStr = await getSystemConfig()
+    if (configStr) {
+      const config = JSON.parse(configStr) as SystemConfig
+      systemConfig.value = config
+      if (config.extendTime) {
+        extendTime.value = config.extendTime
+      }
+    }
+  } catch (error) {
+    console.error('加载系统配置失败:', error)
+  }
+}
 
 // 从数据库加载布局配置
 const loadLayout = async () => {
@@ -671,6 +704,7 @@ const handleStart = (table: TableInfo) => emit('start', table)
 const handlePause = (table: TableInfo) => emit('pause', table)
 const handleResume = (table: TableInfo) => emit('resume', table)
 const handleEnd = (table: TableInfo) => emit('end', table)
+const handleExtend = (table: TableInfo) => emit('extend', table)
 const handleIgnoreRemind = (table: TableInfo) => emit('ignoreRemind', table)
 
 // 快速编辑桌台名称（来自TableCard）
@@ -784,9 +818,10 @@ watch(() => props.categoryId, (newCategoryId) => {
   loadLayout()
 })
 
-// 组件挂载时加载布局
+// 组件挂载时加载布局和系统配置
 onMounted(() => {
   loadLayout()
+  loadSystemConfig()
 })
 </script>
 
@@ -1180,6 +1215,16 @@ onMounted(() => {
   color: #606266;
   margin-bottom: 2px;
   font-family: 'Courier New', monospace;
+}
+
+.table-element__overtime {
+  color: #F56C6C;
+  font-weight: 600;
+}
+
+.table-element__extend-info {
+  font-size: 11px;
+  margin-left: 4px;
 }
 
 .table-element__amount {

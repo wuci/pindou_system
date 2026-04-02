@@ -2,6 +2,8 @@ package com.pindou.timer.controller;
 
 import com.pindou.timer.common.result.Result;
 import com.pindou.timer.dto.BillResponse;
+import com.pindou.timer.dto.EndTableRequest;
+import com.pindou.timer.dto.ExtendTableRequest;
 import com.pindou.timer.dto.StartTimerRequest;
 import com.pindou.timer.dto.TableConfigRequest;
 import com.pindou.timer.dto.TableInfoResponse;
@@ -188,12 +190,13 @@ public class TableController {
     }
 
     /**
-     * 结束计时并结账
+     * 续费时长
      */
-    @Operation(summary = "结束计时并结账")
-    @PostMapping("/{id}/end")
-    public Result<Void> endTimer(
+    @Operation(summary = "续费时长")
+    @PostMapping("/{id}/extend")
+    public Result<TableInfoResponse> extendTimer(
             @PathVariable("id") Integer tableId,
+            @Validated @RequestBody ExtendTableRequest request,
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
 
         // 获取当前用户信息
@@ -209,9 +212,40 @@ public class TableController {
             }
         }
 
-        log.info("结束计时请求: tableId={}, userId={}", tableId, userId);
+        log.info("续费时长请求: tableId={}, additionalDuration={}, userId={}", tableId, request.getAdditionalDuration(), userId);
 
-        tableService.endTimer(tableId, userId, username);
+        TableInfoResponse response = tableService.extendTimer(tableId, request, userId, username);
+
+        return Result.success(response);
+    }
+
+    /**
+     * 结束计时并结账
+     */
+    @Operation(summary = "结束计时并结账")
+    @PostMapping("/{id}/end")
+    public Result<Void> endTimer(
+            @PathVariable("id") Integer tableId,
+            @RequestBody(required = false) EndTableRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        // 获取当前用户信息
+        String userId = "";
+        String username = "system";
+        if (authHeader != null && authHeader.length() > 7) {
+            try {
+                String token = authHeader.substring(7);
+                userId = userService.getUserIdFromToken(token);
+                username = userId;
+            } catch (Exception e) {
+                // Token无效，使用system作为默认值
+            }
+        }
+
+        log.info("结束计时请求: tableId={}, userId={}, memberId={}",
+                tableId, userId, request != null ? request.getMemberId() : null);
+
+        tableService.endTimer(tableId, request, userId, username);
 
         return Result.success();
     }

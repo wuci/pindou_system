@@ -17,10 +17,10 @@ public class BillingRuleItemRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Schema(description = "时长（小时），null表示不限时")
-    private Integer hours;
+    @Schema(description = "时长（分钟），null表示不限时")
+    private Integer minutes;
 
-    @Schema(description = "价格（元）")
+    @Schema(description = "价格（元），保留两位小数")
     private Double price;
 
     @Schema(description = "是否不限时")

@@ -1,5 +1,6 @@
 package com.pindou.timer.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -7,6 +8,7 @@ import com.pindou.timer.common.exception.BusinessException;
 import com.pindou.timer.common.result.ErrorCode;
 import com.pindou.timer.dto.BillingRuleConfigRequest;
 import com.pindou.timer.dto.RemindConfigRequest;
+import com.pindou.timer.dto.SystemConfigRequest;
 import com.pindou.timer.entity.Config;
 import com.pindou.timer.mapper.ConfigMapper;
 import com.pindou.timer.service.ConfigService;
@@ -43,6 +45,11 @@ public class ConfigServiceImpl implements ConfigService {
      */
     private static final String TABLE_COUNT_KEY = "table_count";
 
+    /**
+     * 系统参数配置键
+     */
+    private static final String SYSTEM_CONFIG_KEY = "system_config";
+
     @Resource
     private ConfigMapper configMapper;
 
@@ -74,9 +81,31 @@ public class ConfigServiceImpl implements ConfigService {
     public Boolean updateBillingRuleConfig(BillingRuleConfigRequest request) {
         log.info("更新计费规则配置: request={}", request);
 
-        // 构建新的配置结构
+        // 构建新的配置结构，手动转换为 JSON 数组
         JSONObject configObject = new JSONObject();
-        configObject.set("channels", request.getChannels());
+        cn.hutool.json.JSONArray channelsArray = new cn.hutool.json.JSONArray();
+
+        if (request.getChannels() != null) {
+            for (com.pindou.timer.dto.ChannelBillingRuleRequest channel : request.getChannels()) {
+                JSONObject channelObj = new JSONObject();
+                channelObj.set("channel", channel.getChannel());
+                channelObj.set("channelName", channel.getChannelName());
+
+                // 转换规则数组
+                cn.hutool.json.JSONArray rulesArray = new cn.hutool.json.JSONArray();
+                if (channel.getRules() != null) {
+                    for (Object rule : channel.getRules()) {
+                        // 将规则对象转换为 JSON
+                        String ruleJson = JSONUtil.toJsonStr(rule);
+                        rulesArray.add(JSONUtil.parseObj(ruleJson));
+                    }
+                }
+                channelObj.set("rules", rulesArray);
+                channelsArray.add(channelObj);
+            }
+        }
+
+        configObject.set("channels", channelsArray);
 
         return updateConfig(BILLING_RULE_KEY, configObject.toString());
     }
@@ -149,11 +178,14 @@ public class ConfigServiceImpl implements ConfigService {
         Config existing = getConfigByKey(key);
         if (existing != null) {
             existing.setConfigValue(value);
+            existing.setUpdatedAt(System.currentTimeMillis());
             return configMapper.updateById(existing) > 0;
         } else {
             Config config = new Config();
+            config.setId(IdUtil.simpleUUID());
             config.setConfigKey(key);
             config.setConfigValue(value);
+            config.setUpdatedAt(System.currentTimeMillis());
             return configMapper.insert(config) > 0;
         }
     }
@@ -167,9 +199,9 @@ public class ConfigServiceImpl implements ConfigService {
 
         // 店内渠道默认规则
         cn.hutool.json.JSONArray storeRules = new cn.hutool.json.JSONArray();
-        storeRules.add(createRuleItem(1, 19.0, false));
-        storeRules.add(createRuleItem(2, 35.0, false));
-        storeRules.add(createRuleItem(4, 54.0, false));
+        storeRules.add(createRuleItem(60, 19.0, false));
+        storeRules.add(createRuleItem(120, 35.0, false));
+        storeRules.add(createRuleItem(240, 54.0, false));
         storeRules.add(createRuleItem(null, 68.0, true));
 
         JSONObject storeChannel = new JSONObject();
@@ -179,9 +211,9 @@ public class ConfigServiceImpl implements ConfigService {
 
         // 美团渠道默认规则
         cn.hutool.json.JSONArray meituanRules = new cn.hutool.json.JSONArray();
-        meituanRules.add(createRuleItem(1, 19.0, false));
-        meituanRules.add(createRuleItem(2, 35.0, false));
-        meituanRules.add(createRuleItem(4, 54.0, false));
+        meituanRules.add(createRuleItem(60, 19.0, false));
+        meituanRules.add(createRuleItem(120, 35.0, false));
+        meituanRules.add(createRuleItem(240, 54.0, false));
         meituanRules.add(createRuleItem(null, 68.0, true));
 
         JSONObject meituanChannel = new JSONObject();
@@ -191,9 +223,9 @@ public class ConfigServiceImpl implements ConfigService {
 
         // 大众点评渠道默认规则
         cn.hutool.json.JSONArray dianpingRules = new cn.hutool.json.JSONArray();
-        dianpingRules.add(createRuleItem(1, 19.0, false));
-        dianpingRules.add(createRuleItem(2, 35.0, false));
-        dianpingRules.add(createRuleItem(4, 54.0, false));
+        dianpingRules.add(createRuleItem(60, 19.0, false));
+        dianpingRules.add(createRuleItem(120, 35.0, false));
+        dianpingRules.add(createRuleItem(240, 54.0, false));
         dianpingRules.add(createRuleItem(null, 68.0, true));
 
         JSONObject dianpingChannel = new JSONObject();
@@ -215,9 +247,9 @@ public class ConfigServiceImpl implements ConfigService {
     /**
      * 创建规则项
      */
-    private JSONObject createRuleItem(Integer hours, Double price, boolean unlimited) {
+    private JSONObject createRuleItem(Integer minutes, Double price, boolean unlimited) {
         JSONObject rule = new JSONObject();
-        rule.set("hours", hours);
+        rule.set("minutes", minutes);
         rule.set("price", price);
         rule.set("unlimited", unlimited);
         return rule;
@@ -231,6 +263,36 @@ public class ConfigServiceImpl implements ConfigService {
         jsonObject.set("threshold", 300); // 5分钟
         jsonObject.set("soundEnabled", 1);
         jsonObject.set("repeatInterval", 60); // 1分钟
+        return jsonObject.toString();
+    }
+
+    @Override
+    public String getSystemConfig() {
+        Config config = getConfigByKey(SYSTEM_CONFIG_KEY);
+        if (config == null) {
+            return getDefaultSystemConfig();
+        }
+        return config.getConfigValue();
+    }
+
+    @Override
+    public Boolean updateSystemConfig(SystemConfigRequest request) {
+        log.info("更新系统参数配置: request={}", request);
+
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.set("extendTime", request.getExtendTime());
+        jsonObject.set("invalidOrderTime", request.getInvalidOrderTime() != null ? request.getInvalidOrderTime() : 0);
+
+        return updateConfig(SYSTEM_CONFIG_KEY, jsonObject.toString());
+    }
+
+    /**
+     * 获取默认系统参数配置
+     */
+    private String getDefaultSystemConfig() {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.set("extendTime", 30); // 默认30分钟
+        jsonObject.set("invalidOrderTime", 0); // 默认0分钟（不限制）
         return jsonObject.toString();
     }
 }

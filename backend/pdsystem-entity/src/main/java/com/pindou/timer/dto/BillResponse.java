@@ -50,6 +50,12 @@ public class BillResponse implements Serializable {
     @Schema(description = "金额明细")
     private AmountDetail amountDetail;
 
+    @Schema(description = "原价（折扣前）")
+    private java.math.BigDecimal originalAmount;
+
+    @Schema(description = "会员信息")
+    private MemberInfo member;
+
     @Schema(description = "状态：active-进行中 completed-已完成")
     private String status;
 }

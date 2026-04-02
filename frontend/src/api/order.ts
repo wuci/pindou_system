@@ -6,6 +6,7 @@ import type { PageResult, PageParams } from '@/types'
  */
 export interface OrderInfo {
   id: string
+  orderNo: string  // 订单编号
   tableId: number
   tableName: string
   startTime: number
@@ -13,11 +14,18 @@ export interface OrderInfo {
   duration: number
   pauseDuration: number
   presetDuration: number | null
+  channel: string  // 订餐渠道
   status: 'active' | 'completed'
   amount: number
+  originalAmount?: number  // 原价（折扣前）
+  discountAmount?: number  // 折扣金额
   operatorName: string
   paidAt: number | null
   createdAt: number
+  memberId?: number | null  // 会员ID
+  memberName?: string  // 会员姓名（用于显示）
+  memberLevelName?: string  // 会员等级名称
+  memberDiscountRate?: number  // 会员折扣率
 }
 
 /**
@@ -57,20 +65,26 @@ export interface OrderDetail {
   presetDuration: number | null
   status: 'active' | 'completed'
   amount: number
+  originalAmount?: number  // 原价（折扣前）
+  discountAmount?: number  // 折扣金额
   normalAmount: number
   overtimeAmount: number
   operatorId: string
   operatorName: string
   createdAt: number
   updatedAt: number
+  memberId?: number | null  // 会员ID
+  memberName?: string  // 会员姓名
+  memberLevelName?: string  // 会员等级名称
+  memberDiscountRate?: number  // 会员折扣率
   timeLine: TimeLineItem[]
 }
 
 /**
- * 获取当前订单
+ * 获取当前订单（分页）
  */
-export const getActiveOrders = () => {
-  return http.get<OrderInfo[]>('/orders/active')
+export const getActiveOrders = (params?: PageParams) => {
+  return http.get<PageResult<OrderInfo>>('/orders/active', { params })
 }
 
 /**

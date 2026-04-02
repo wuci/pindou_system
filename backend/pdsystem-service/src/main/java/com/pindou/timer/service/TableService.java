@@ -1,6 +1,8 @@
 package com.pindou.timer.service;
 
 import com.pindou.timer.dto.BillResponse;
+import com.pindou.timer.dto.EndTableRequest;
+import com.pindou.timer.dto.ExtendTableRequest;
 import com.pindou.timer.dto.StartTimerRequest;
 import com.pindou.timer.dto.TableConfigRequest;
 import com.pindou.timer.dto.TableInfoResponse;
@@ -71,6 +73,17 @@ public interface TableService {
     void resumeTimer(Integer tableId, String userId, String username);
 
     /**
+     * 续费时长
+     *
+     * @param tableId 桌台编号
+     * @param request 续费请求
+     * @param userId 操作用户ID
+     * @param username 操作用户名
+     * @return 桌台信息
+     */
+    TableInfoResponse extendTimer(Integer tableId, ExtendTableRequest request, String userId, String username);
+
+    /**
      * 忽略提醒
      *
      * @param tableId 桌台编号
@@ -83,10 +96,11 @@ public interface TableService {
      * 结束计时并结账
      *
      * @param tableId 桌台编号
+     * @param request 结账请求（包含会员ID）
      * @param userId 操作用户ID
      * @param username 操作用户名
      */
-    void endTimer(Integer tableId, String userId, String username);
+    void endTimer(Integer tableId, EndTableRequest request, String userId, String username);
 
     /**
      * 获取桌台账单

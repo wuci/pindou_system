@@ -69,6 +69,14 @@
       <section class="detail-section">
         <h3 class="section-title">费用明细</h3>
         <div class="amount-list">
+          <div v-if="detail.originalAmount && detail.originalAmount > detail.amount" class="amount-item">
+            <span class="label">原价</span>
+            <span class="value original">¥{{ formatMoney(detail.originalAmount) }}</span>
+          </div>
+          <div v-if="detail.discountAmount > 0" class="amount-item">
+            <span class="label">会员优惠</span>
+            <span class="value discount">-¥{{ formatMoney(detail.discountAmount) }}</span>
+          </div>
           <div class="amount-item">
             <span class="label">正常费用</span>
             <span class="value">¥{{ formatMoney(detail.normalAmount) }}</span>
@@ -78,8 +86,27 @@
             <span class="value overtime">¥{{ formatMoney(detail.overtimeAmount) }}</span>
           </div>
           <div class="amount-item total">
-            <span class="label">总计</span>
+            <span class="label">实付金额</span>
             <span class="value total-amount">¥{{ formatMoney(detail.amount) }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 会员信息 -->
+      <section v-if="detail.memberName" class="detail-section">
+        <h3 class="section-title">会员信息</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">会员姓名</span>
+            <span class="value">{{ detail.memberName }}</span>
+          </div>
+          <div v-if="detail.memberLevelName" class="info-item">
+            <span class="label">会员等级</span>
+            <el-tag type="success" size="small">{{ detail.memberLevelName }}</el-tag>
+          </div>
+          <div v-if="detail.memberDiscountRate" class="info-item">
+            <span class="label">折扣率</span>
+            <span class="value discount">{{ (detail.memberDiscountRate * 10).toFixed(1) }}折</span>
           </div>
         </div>
       </section>
@@ -257,6 +284,11 @@ const formatMoney = (amount: number) => {
   color: #409eff;
 }
 
+.info-item .value.discount {
+  font-weight: 600;
+  color: #67c23a;
+}
+
 .amount-list {
   display: flex;
   flex-direction: column;
@@ -285,6 +317,15 @@ const formatMoney = (amount: number) => {
 
 .amount-item .value.overtime {
   color: #e6a23c;
+}
+
+.amount-item .value.original {
+  color: #909399;
+  text-decoration: line-through;
+}
+
+.amount-item .value.discount {
+  color: #67c23a;
 }
 
 .amount-item.total {
