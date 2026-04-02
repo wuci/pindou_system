@@ -27,6 +27,12 @@ public class ExtendTableRequest implements Serializable {
     @Schema(description = "订餐渠道", example = "store")
     private String channel;
 
+    @Schema(description = "会员ID", example = "1")
+    private Long memberId;
+
+    @Schema(description = "支付方式：offline-线下, online-线上, balance-余额, combined-组合", example = "offline")
+    private String paymentMethod;
+
     @Schema(description = "备注", example = "客户续费")
     private String note;
 }

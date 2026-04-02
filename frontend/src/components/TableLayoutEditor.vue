@@ -81,6 +81,8 @@
                 @extend="handleExtend"
                 @ignoreRemind="handleIgnoreRemind"
                 @edit="handleEditTableName"
+                @reserve="handleReserve"
+                @cancelReservation="handleCancelReservation"
               />
             </div>
           </div>
@@ -319,6 +321,8 @@ const emit = defineEmits<{
   edit: [table: TableInfo]
   select: [tableId: number, selected: boolean]
   batchDelete: []
+  reserve: [table: TableInfo]
+  cancelReservation: [table: TableInfo]
 }>()
 
 // 视图模式
@@ -706,6 +710,8 @@ const handleResume = (table: TableInfo) => emit('resume', table)
 const handleEnd = (table: TableInfo) => emit('end', table)
 const handleExtend = (table: TableInfo) => emit('extend', table)
 const handleIgnoreRemind = (table: TableInfo) => emit('ignoreRemind', table)
+const handleReserve = (table: TableInfo) => emit('reserve', table)
+const handleCancelReservation = (table: TableInfo) => emit('cancelReservation', table)
 
 // 快速编辑桌台名称（来自TableCard）
 const handleEditTableName = (table: TableInfo) => {

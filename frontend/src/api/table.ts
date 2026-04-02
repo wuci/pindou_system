@@ -65,6 +65,7 @@ export interface TableInfo {
   memberId?: number  // 会员ID
   memberName?: string  // 会员姓名
   memberDiscountRate?: number  // 会员折扣率
+  memberBalance?: number  // 会员余额
   channel?: string  // 订单渠道
   // 预定相关字段
   reservationStatus?: 'none' | 'reserved'  // 预定状态：none-未预定，reserved-已预定
@@ -105,6 +106,7 @@ export interface BillMemberInfo {
   discountRate: number
   discountAmount: number
   finalAmount: number
+  balance: number  // 会员余额
 }
 
 /**
@@ -129,6 +131,9 @@ export interface BillInfo {
     totalAmount: number
   }
   member?: BillMemberInfo  // 会员信息
+  paymentMethod?: PaymentMethod  // 支付方式
+  balanceAmount?: number  // 余额支付金额
+  otherPaymentAmount?: number  // 其他方式支付金额
 }
 
 /**
@@ -180,6 +185,7 @@ export const resumeTable = (id: number) => {
  */
 export interface EndTableParams {
   memberId?: number | null
+  paymentMethod?: PaymentMethod  // 支付方式
 }
 
 /**

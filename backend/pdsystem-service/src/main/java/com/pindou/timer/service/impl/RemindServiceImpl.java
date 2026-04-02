@@ -81,17 +81,24 @@ public class RemindServiceImpl implements RemindService {
                 presetDuration = 24 * 60 * 60; // 24小时
             }
 
+            // 获取延长时间配置（分钟）
+            int extendTimeMinutes = getExtendTimeConfig();
+            int extendTimeSeconds = extendTimeMinutes * 60;
+
+            // 总时长 = 预设时长 + 延长时间
+            int totalDuration = presetDuration + extendTimeSeconds;
+
             // 检查即将到期（剩余时间 <= 阈值）
-            if (actualDuration < presetDuration) {
-                int remainingDuration = presetDuration - (int) actualDuration;
+            if (actualDuration < totalDuration) {
+                int remainingDuration = totalDuration - (int) actualDuration;
                 if (remainingDuration <= remindConfig.threshold
                         && (table.getReminded() == null || table.getReminded() == 0)) {
                     reminders.add(createRemindInfo(table, REMIND_TYPE_EXPIRING,
                             (int) actualDuration, remainingDuration, 0));
                 }
             } else {
-                // 已超时
-                int overtimeDuration = (int) actualDuration - presetDuration;
+                // 已超时（超过总时长才算超时）
+                int overtimeDuration = (int) actualDuration - totalDuration;
                 // 超时后重复提醒
                 if (table.getRemindIgnored() == null || table.getRemindIgnored() == 0) {
                     // 计算距离上次提醒的时间间隔
@@ -165,6 +172,35 @@ public class RemindServiceImpl implements RemindService {
     private static class RemindConfig {
         int threshold = 300; // 5分钟
         int repeatInterval = 60; // 1分钟
+    }
+
+    /**
+     * 获取延长时间配置（分钟）
+     */
+    private int getExtendTimeConfig() {
+        try {
+            String configStr = getSystemConfig();
+            if (configStr != null && !configStr.isEmpty()) {
+                cn.hutool.json.JSONObject config = JSONUtil.parseObj(configStr);
+                Integer extendTime = config.getInt("extendTime");
+                if (extendTime != null && extendTime > 0) {
+                    return extendTime;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取延长时间配置失败，使用默认值: {}", e.getMessage());
+        }
+        return 30; // 默认30分钟
+    }
+
+    /**
+     * 获取系统配置
+     */
+    private String getSystemConfig() {
+        LambdaQueryWrapper<Config> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Config::getConfigKey, "system_config");
+        Config config = configMapper.selectOne(wrapper);
+        return config != null ? config.getConfigValue() : null;
     }
 
     /**

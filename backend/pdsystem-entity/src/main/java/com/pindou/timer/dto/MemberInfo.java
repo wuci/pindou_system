@@ -35,4 +35,7 @@ public class MemberInfo implements Serializable {
 
     @Schema(description = "折后金额")
     private BigDecimal finalAmount;
+
+    @Schema(description = "会员余额")
+    private BigDecimal balance;
 }

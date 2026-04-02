@@ -59,6 +59,9 @@ public class TableInfoResponse implements Serializable {
     @Schema(description = "会员折扣率")
     private Double memberDiscountRate;
 
+    @Schema(description = "会员余额")
+    private Double memberBalance;
+
     @Schema(description = "是否已提醒：1-是 0-否")
     private Integer reminded;
 

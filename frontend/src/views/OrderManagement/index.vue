@@ -1,21 +1,22 @@
 <template>
   <div class="order-management">
-    <el-card>
+    <el-card class="main-card">
       <template #header>
         <div class="card-header">
-          <span>订单管理</span>
+          <span class="card-title">订单管理</span>
           <el-button
             type="primary"
-            size="small"
+            size="default"
             @click="handleExport"
             :loading="exporting"
           >
-            导出订单
+            <el-icon><Download /></el-icon>
+            <span style="margin-left: 6px">导出订单</span>
           </el-button>
         </div>
       </template>
 
-      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="order-tabs">
         <!-- 当前订单 -->
         <el-tab-pane label="当前订单" name="active">
           <div v-if="activeLoading" class="loading-container">
@@ -28,63 +29,85 @@
             v-else
             :data="activeOrders"
             stripe
-            style="width: 100%"
+            class="order-table"
+            :row-style="{ height: '64px' }"
+            :cell-style="{ fontSize: '14px' }"
+            :header-cell-style="{ fontSize: '14px', fontWeight: '600', background: '#f5f7fa' }"
           >
-            <el-table-column label="订单编号" width="160">
+            <el-table-column label="订单编号" width="180">
               <template #default="{ row }">
                 <span class="order-no">{{ row.orderNo || row.id }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="tableName" label="桌台" width="80" />
-            <el-table-column label="渠道" width="90">
+            <el-table-column prop="tableName" label="桌台" width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="getChannelType(row.channel)" size="small">{{ getChannelName(row.channel) }}</el-tag>
+                <el-tag type="info" size="large" effect="plain">{{ row.tableName }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="开始时间" width="140">
+            <el-table-column label="套餐类型" width="150" align="center">
               <template #default="{ row }">
-                {{ formatDateTime(row.startTime) }}
+                <el-tag :type="getPackageTypeColor(row)" size="large" effect="plain">
+                  {{ getPackageTypeName(row) }}
+                </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="时长" width="90">
+            <el-table-column label="渠道" width="110" align="center">
               <template #default="{ row }">
-                <div>{{ formatDuration(row.duration) }}</div>
-                <div v-if="row.pauseDuration > 0" class="pause-text">
-                  暂停{{ formatDuration(row.pauseDuration) }}
+                <el-tag :type="getChannelTagType(row.channel)" size="small" effect="plain">
+                  {{ getChannelDisplayName(row.channel) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="开始时间" width="170">
+              <template #default="{ row }">
+                <span class="time-text">{{ formatDateTime(row.startTime) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="使用时长" width="140" align="center">
+              <template #default="{ row }">
+                <div class="duration-cell">
+                  <div class="duration-main">{{ formatDuration(row.duration) }}</div>
+                  <div v-if="row.pauseDuration > 0" class="pause-text">
+                    暂停{{ formatDuration(row.pauseDuration) }}
+                  </div>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="费用明细" width="120">
+            <el-table-column label="费用" width="140" align="right">
               <template #default="{ row }">
-                <div v-if="row.originalAmount && row.originalAmount > row.amount">
-                  <div style="font-size: 11px; color: #909399;">原价 ¥{{ formatMoney(row.originalAmount) }}</div>
-                  <div style="font-size: 13px; color: #409eff; font-weight: 600;">实付 ¥{{ formatMoney(row.amount) }}</div>
-                </div>
-                <div v-else>
-                  <span style="font-size: 13px; font-weight: 600; color: #409eff;">¥{{ formatMoney(row.amount) }}</span>
+                <div class="amount-cell">
+                  <div v-if="row.originalAmount && row.originalAmount > row.amount" class="amount-with-original">
+                    <span class="original-amount">¥{{ formatMoney(row.originalAmount) }}</span>
+                    <span class="final-amount">¥{{ formatMoney(row.amount) }}</span>
+                  </div>
+                  <div v-else class="amount-simple">
+                    <span class="final-amount">¥{{ formatMoney(row.amount) }}</span>
+                  </div>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="会员信息" width="100">
+            <el-table-column label="会员" width="120" align="center">
               <template #default="{ row }">
-                <div v-if="row.memberName" style="font-size: 12px;">
-                  <div style="color: #303133; font-weight: 500;">{{ row.memberName }}</div>
-                  <div v-if="row.memberDiscountRate" style="color: #67c23a;">{{ (row.memberDiscountRate * 10).toFixed(1) }}折</div>
+                <div v-if="row.memberName" class="member-cell">
+                  <div class="member-name">{{ row.memberName }}</div>
+                  <el-tag v-if="row.memberDiscountRate" type="success" size="small" effect="plain">
+                    {{ (row.memberDiscountRate * 10).toFixed(1) }}折
+                  </el-tag>
                 </div>
-                <span v-else style="color: #909399; font-size: 12px;">非会员</span>
+                <span v-else class="non-member">非会员</span>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.status === 'active'" type="success" size="small">进行中</el-tag>
-                <el-tag v-else-if="row.status === 'completed'" type="info" size="small">已完成</el-tag>
+                <el-tag v-if="row.status === 'active'" type="success" size="large" effect="plain">进行中</el-tag>
+                <el-tag v-else-if="row.status === 'completed'" type="info" size="large" effect="plain">已完成</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="80" fixed="right">
+            <el-table-column label="操作" width="100" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button
                   type="primary"
-                  size="small"
+                  size="default"
                   link
                   @click="handleViewDetail(row.id)"
                 >
@@ -112,13 +135,13 @@
         <el-tab-pane label="历史订单" name="history">
           <!-- 筛选条件 -->
           <div class="filter-container">
-            <el-form :inline="true" :model="queryForm" @submit.prevent="handleQuery">
+            <el-form :inline="true" :model="queryForm" @submit.prevent="handleQuery" class="filter-form">
               <el-form-item label="订单状态">
                 <el-select
                   v-model="queryForm.status"
                   placeholder="全部状态"
                   clearable
-                  style="width: 120px"
+                  style="width: 140px"
                 >
                   <el-option label="全部" value="" />
                   <el-option label="已完成" value="completed" />
@@ -135,6 +158,7 @@
                   end-placeholder="结束日期"
                   value-format="x"
                   @change="handleDateChange"
+                  style="width: 280px"
                 />
               </el-form-item>
               <el-form-item label="桌台">
@@ -142,7 +166,7 @@
                   v-model="queryForm.tableId"
                   placeholder="全部桌台"
                   clearable
-                  style="width: 120px"
+                  style="width: 140px"
                 >
                   <el-option
                     v-for="i in 50"
@@ -157,12 +181,22 @@
                   v-model="queryForm.keyword"
                   placeholder="桌台名称/操作员"
                   clearable
-                  style="width: 150px"
-                />
+                  style="width: 180px"
+                >
+                  <template #prefix>
+                    <el-icon><Search /></el-icon>
+                  </template>
+                </el-input>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" @click="handleQuery">查询</el-button>
-                <el-button @click="handleReset">重置</el-button>
+                <el-button type="primary" @click="handleQuery">
+                  <el-icon><Search /></el-icon>
+                  <span style="margin-left: 4px">查询</span>
+                </el-button>
+                <el-button @click="handleReset">
+                  <el-icon><RefreshLeft /></el-icon>
+                  <span style="margin-left: 4px">重置</span>
+                </el-button>
               </el-form-item>
             </el-form>
           </div>
@@ -178,69 +212,91 @@
             v-else
             :data="historyOrders"
             stripe
-            style="width: 100%"
+            class="order-table"
+            :row-style="{ height: '64px' }"
+            :cell-style="{ fontSize: '14px' }"
+            :header-cell-style="{ fontSize: '14px', fontWeight: '600', background: '#f5f7fa' }"
           >
-            <el-table-column label="订单编号" width="160">
+            <el-table-column label="订单编号" width="180">
               <template #default="{ row }">
                 <span class="order-no">{{ row.orderNo || row.id }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="tableName" label="桌台" width="80" />
-            <el-table-column label="渠道" width="90">
+            <el-table-column prop="tableName" label="桌台" width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="getChannelType(row.channel)" size="small">{{ getChannelName(row.channel) }}</el-tag>
+                <el-tag type="info" size="large" effect="plain">{{ row.tableName }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="套餐类型" width="150" align="center">
               <template #default="{ row }">
-                <div style="font-size: 12px;">
+                <el-tag :type="getPackageTypeColor(row)" size="large" effect="plain">
+                  {{ getPackageTypeName(row) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="渠道" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getChannelTagType(row.channel)" size="small" effect="plain">
+                  {{ getChannelDisplayName(row.channel) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="时间" width="200">
+              <template #default="{ row }">
+                <div class="time-range-cell">
                   <div>{{ formatDateTime(row.startTime) }}</div>
-                  <div v-if="row.endTime" style="color: #909399;">至 {{ formatDateTime(row.endTime) }}</div>
+                  <div v-if="row.endTime" class="end-time">至 {{ formatDateTime(row.endTime) }}</div>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时长" width="90">
+            <el-table-column label="使用时长" width="140" align="center">
               <template #default="{ row }">
-                <div>{{ formatDuration(row.duration) }}</div>
-                <div v-if="row.pauseDuration > 0" class="pause-text">
-                  暂停{{ formatDuration(row.pauseDuration) }}
+                <div class="duration-cell">
+                  <div class="duration-main">{{ formatDuration(row.duration) }}</div>
+                  <div v-if="row.pauseDuration > 0" class="pause-text">
+                    暂停{{ formatDuration(row.pauseDuration) }}
+                  </div>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="费用明细" width="120">
+            <el-table-column label="费用" width="140" align="right">
               <template #default="{ row }">
-                <div v-if="row.originalAmount && row.originalAmount > row.amount">
-                  <div style="font-size: 11px; color: #909399;">原价 ¥{{ formatMoney(row.originalAmount) }}</div>
-                  <div style="font-size: 13px; color: #409eff; font-weight: 600;">实付 ¥{{ formatMoney(row.amount) }}</div>
-                </div>
-                <div v-else>
-                  <span style="font-size: 13px; font-weight: 600; color: #409eff;">¥{{ formatMoney(row.amount) }}</span>
+                <div class="amount-cell">
+                  <div v-if="row.originalAmount && row.originalAmount > row.amount" class="amount-with-original">
+                    <span class="original-amount">¥{{ formatMoney(row.originalAmount) }}</span>
+                    <span class="final-amount">¥{{ formatMoney(row.amount) }}</span>
+                  </div>
+                  <div v-else class="amount-simple">
+                    <span class="final-amount">¥{{ formatMoney(row.amount) }}</span>
+                  </div>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="会员信息" width="100">
+            <el-table-column label="会员" width="120" align="center">
               <template #default="{ row }">
-                <div v-if="row.memberName" style="font-size: 12px;">
-                  <div style="color: #303133; font-weight: 500;">{{ row.memberName }}</div>
-                  <div v-if="row.memberDiscountRate" style="color: #67c23a;">{{ (row.memberDiscountRate * 10).toFixed(1) }}折</div>
+                <div v-if="row.memberName" class="member-cell">
+                  <div class="member-name">{{ row.memberName }}</div>
+                  <el-tag v-if="row.memberDiscountRate" type="success" size="small" effect="plain">
+                    {{ (row.memberDiscountRate * 10).toFixed(1) }}折
+                  </el-tag>
                 </div>
-                <span v-else style="color: #909399; font-size: 12px;">非会员</span>
+                <span v-else class="non-member">非会员</span>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="80">
+            <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.status === 'active'" type="success" size="small">进行中</el-tag>
-                <el-tag v-else-if="row.status === 'completed'" type="info" size="small">已完成</el-tag>
-                <el-tag v-else-if="row.status === 'cancelled'" type="danger" size="small">已作废</el-tag>
-                <el-tag v-else type="warning" size="small">{{ row.status }}</el-tag>
+                <el-tag v-if="row.status === 'active'" type="success" size="large" effect="plain">进行中</el-tag>
+                <el-tag v-else-if="row.status === 'completed'" type="info" size="large" effect="plain">已完成</el-tag>
+                <el-tag v-else-if="row.status === 'cancelled'" type="danger" size="large" effect="plain">已作废</el-tag>
+                <el-tag v-else type="warning" size="large" effect="plain">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="operatorName" label="操作员" width="100" />
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column prop="operatorName" label="操作员" width="110" align="center" />
+            <el-table-column label="操作" width="100" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button
                   type="primary"
-                  size="small"
+                  size="default"
                   link
                   @click="handleViewDetail(row.id)"
                 >
@@ -279,7 +335,12 @@ import { ref, reactive, onMounted } from 'vue'
 import { getActiveOrders, getHistoryOrders, exportOrders } from '@/api/order'
 import type { OrderInfo } from '@/api/order'
 import { ElMessage } from 'element-plus'
+import { Download, Search, RefreshLeft } from '@element-plus/icons-vue'
 import OrderDetailDrawer from '@/components/OrderDetailDrawer.vue'
+import { useChannelTranslation } from '@/composables/useChannelTranslation'
+
+// 渠道翻译
+const { loadBillingRules, getChannels, getChannelName } = useChannelTranslation()
 
 // 当前订单
 const activeTab = ref('active')
@@ -314,7 +375,8 @@ const selectedOrderId = ref('')
 // 导出
 const exporting = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
+  await loadBillingRules()
   loadActiveOrders()
   loadHistoryOrders()
 })
@@ -481,28 +543,125 @@ const formatMoney = (amount: number) => {
   return amount.toFixed(2)
 }
 
-const getChannelName = (channel: string) => {
-  const map: Record<string, string> = {
-    store: '店内',
-    meituan: '美团',
-    dianping: '大众点评'
+/**
+ * 获取套餐类型名称
+ */
+const getPackageTypeName = (order: OrderInfo): string => {
+  if (!order.presetDuration) {
+    return '不限时'
   }
-  return map[channel] || channel
+
+  const presetMinutes = Math.round(order.presetDuration / 60)
+
+  // 在计费规则中查找匹配的规则
+  const channels = getChannels.value
+  for (const channel of channels) {
+    if (channel.channel === order.channel) {
+      for (const rule of channel.rules) {
+        if (rule.unlimited) {
+          if (!order.presetDuration) {
+            return '不限时'
+          }
+        } else if (rule.minutes === presetMinutes) {
+          // 找到匹配的规则，使用时长作为套餐名称
+          return formatRuleTime(rule)
+        }
+      }
+    }
+  }
+
+  // 没有找到匹配的规则，使用默认格式
+  return formatDefaultPackageType(presetMinutes)
 }
 
-const getChannelType = (channel: string): 'success' | 'warning' | 'danger' | 'info' => {
-  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
-    store: 'success',
+/**
+ * 格式化规则时间
+ */
+const formatRuleTime = (rule: any): string => {
+  if (rule.unlimited) {
+    return '不限时'
+  }
+  const totalMinutes = rule.minutes || 0
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}小时${minutes}分`
+  } else if (hours > 0) {
+    return `${hours}小时套餐`
+  } else {
+    return `${minutes}分钟套餐`
+  }
+}
+
+/**
+ * 格式化默认套餐类型
+ */
+const formatDefaultPackageType = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+
+  if (hours > 0 && mins > 0) {
+    return `${hours}小时${mins}分`
+  } else if (hours > 0) {
+    return `${hours}小时套餐`
+  } else {
+    return `${mins}分钟套餐`
+  }
+}
+
+/**
+ * 获取套餐类型颜色
+ */
+const getPackageTypeColor = (order: OrderInfo): 'success' | 'warning' | 'danger' | 'info' => {
+  if (!order.presetDuration) {
+    return 'danger'
+  }
+
+  const presetMinutes = Math.round(order.presetDuration / 60)
+
+  // 根据时长返回不同的颜色
+  if (presetMinutes >= 240) {
+    return 'danger' // 4小时以上 - 红色
+  } else if (presetMinutes >= 120) {
+    return 'warning' // 2-4小时 - 橙色
+  } else if (presetMinutes >= 60) {
+    return 'success' // 1-2小时 - 绿色
+  } else {
+    return 'info' // 1小时以下 - 灰色
+  }
+}
+
+/**
+ * 获取渠道显示名称
+ */
+const getChannelDisplayName = (channel: string): string => {
+  return getChannelName(channel || 'store')
+}
+
+/**
+ * 获取渠道标签颜色
+ */
+const getChannelTagType = (channel: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' => {
+  const typeMap: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'primary'> = {
+    store: 'primary',
     meituan: 'warning',
     dianping: 'danger'
   }
-  return map[channel] || 'info'
+  return typeMap[channel] || 'info'
 }
 </script>
 
 <style scoped>
 .order-management {
-  padding: 20px;
+  padding: 24px;
+  background: #f5f7fa;
+  min-height: calc(100vh - 40px);
+}
+
+.main-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .card-header {
@@ -511,46 +670,212 @@ const getChannelType = (channel: string): 'success' | 'warning' | 'danger' | 'in
   align-items: center;
 }
 
+.card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.order-tabs {
+  padding: 0 4px;
+}
+
+.order-table {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.order-table :deep(.el-table__row) {
+  transition: background-color 0.3s;
+}
+
+.order-table :deep(.el-table__row:hover) {
+  background-color: #f5f7fa !important;
+}
+
 .loading-container {
-  padding: 20px;
+  padding: 40px;
 }
 
 .empty-container {
-  padding: 40px 0;
+  padding: 60px 0;
 }
 
 .filter-container {
   margin-bottom: 20px;
-  padding: 15px;
-  background: #f5f7fa;
-  border-radius: 4px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.filter-form {
+  margin-bottom: 0;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+  margin-right: 16px;
+}
+
+.filter-form :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #606266;
 }
 
 .pagination-container {
-  margin-top: 20px;
+  margin-top: 24px;
   display: flex;
   justify-content: flex-end;
+  padding: 16px 0;
 }
 
-.amount {
+/* 订单编号 */
+.order-no {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* 时间文本 */
+.time-text {
+  font-size: 14px;
+  color: #606266;
+}
+
+.time-range-cell {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.time-range-cell .end-time {
+  color: #909399;
+  margin-top: 2px;
+}
+
+/* 时长单元格 */
+.duration-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.duration-main {
+  font-size: 15px;
   font-weight: 600;
-  color: #409eff;
+  color: #303133;
 }
 
-.has-pause {
+.pause-text {
+  font-size: 12px;
   color: #e6a23c;
   font-weight: 500;
 }
 
-.order-no {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-  color: #606266;
+/* 金额单元格 */
+.amount-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
-.pause-text {
-  font-size: 11px;
-  color: #e6a23c;
-  margin-top: 2px;
+.amount-with-original {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.original-amount {
+  font-size: 12px;
+  color: #909399;
+  text-decoration: line-through;
+  font-weight: 400;
+}
+
+.final-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #409eff;
+}
+
+.amount-simple .final-amount {
+  font-size: 16px;
+}
+
+/* 会员单元格 */
+.member-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.member-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.non-member {
+  font-size: 13px;
+  color: #c0c4cc;
+}
+
+/* 标签样式优化 */
+:deep(.el-tag--large) {
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+:deep(.el-tag--plain) {
+  background-color: #ffffff;
+}
+
+/* 按钮样式优化 */
+:deep(.el-button--default) {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+:deep(.el-button--primary.is-link) {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 12px;
+}
+
+/* 分页样式优化 */
+:deep(.el-pagination) {
+  font-weight: 500;
+}
+
+:deep(.el-pagination .el-pager li) {
+  border-radius: 4px;
+}
+
+:deep(.el-pagination .el-pager li.is-active) {
+  background-color: #409eff;
+  color: #ffffff;
+}
+
+/* 输入框和选择器样式优化 */
+:deep(.el-input__wrapper) {
+  border-radius: 4px;
+}
+
+:deep(.el-select .el-input__wrapper) {
+  border-radius: 4px;
+}
+
+:deep(.el-date-editor) {
+  border-radius: 4px;
 }
 </style>

@@ -1,5 +1,6 @@
 package com.pindou.timer.controller;
 
+import com.pindou.timer.annotation.LogOperation;
 import com.pindou.timer.common.result.PageResult;
 import com.pindou.timer.common.result.Result;
 import com.pindou.timer.dto.*;
@@ -88,6 +89,11 @@ public class MemberController {
      * 创建会员
      */
     @Operation(summary = "创建会员")
+    @LogOperation(
+        module = "会员管理",
+        operation = "创建会员",
+        description = "创建会员【#request.name】，手机号【#request.phone】"
+    )
     @PostMapping
     public Result<Long> createMember(@Validated @RequestBody CreateMemberRequest request) {
         log.info("创建会员请求: name={}, phone={}", request.getName(), request.getPhone());
@@ -101,6 +107,11 @@ public class MemberController {
      * 更新会员
      */
     @Operation(summary = "更新会员")
+    @LogOperation(
+        module = "会员管理",
+        operation = "更新会员",
+        description = "更新会员【#memberId】信息"
+    )
     @PutMapping("/{id}")
     public Result<Void> updateMember(
             @Parameter(description = "会员ID") @PathVariable("id") Long memberId,
@@ -117,6 +128,11 @@ public class MemberController {
      * 删除会员
      */
     @Operation(summary = "删除会员")
+    @LogOperation(
+        module = "会员管理",
+        operation = "删除会员",
+        description = "删除会员【#memberId】"
+    )
     @DeleteMapping("/{id}")
     public Result<Void> deleteMember(
             @Parameter(description = "会员ID") @PathVariable("id") Long memberId) {
@@ -148,6 +164,11 @@ public class MemberController {
      * 会员充值
      */
     @Operation(summary = "会员充值")
+    @LogOperation(
+        module = "会员管理",
+        operation = "会员充值",
+        description = "会员【#memberId】充值【#request.amount】元，支付方式【#request.paymentMethod】"
+    )
     @PostMapping("/{id}/recharge")
     public Result<BigDecimal> recharge(
             @Parameter(description = "会员ID") @PathVariable("id") Long memberId,

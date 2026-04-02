@@ -35,7 +35,7 @@
           <span class="value">{{ formatDuration(bill.pauseDuration) }}</span>
         </div>
         <div class="info-row" v-if="bill.presetDuration">
-          <span class="label">预设时长</span>
+          <span class="label">套餐时长</span>
           <span class="value">{{ formatDuration(bill.presetDuration) }}</span>
         </div>
         <div class="info-row">
@@ -57,6 +57,10 @@
             <el-tag type="success" size="small">{{ bill.member.levelName }}</el-tag>
             <span style="margin-left: 8px;">{{ (bill.member.discountRate * 10).toFixed(1) }}折</span>
           </span>
+        </div>
+        <div class="info-row">
+          <span class="label">会员余额</span>
+          <span class="value member-balance">¥{{ formatMoney(bill.member.balance) }}</span>
         </div>
       </div>
 
@@ -84,6 +88,25 @@
           <span class="label">超时费用</span>
           <span class="value overtime">¥{{ formatMoney(bill.amountDetail?.overtimeAmount) }}</span>
         </div>
+
+        <!-- 支付方式信息 -->
+        <div v-if="bill.paymentMethod" class="payment-method-section">
+          <div class="payment-method-title">支付方式</div>
+          <div class="payment-method-info">
+            <div class="payment-method-name">{{ getPaymentMethodLabel(bill.paymentMethod) }}</div>
+            <div v-if="bill.paymentMethod === 'balance' || bill.paymentMethod === 'combined'" class="payment-breakdown">
+              <div v-if="bill.balanceAmount && bill.balanceAmount > 0" class="payment-breakdown-item">
+                <span class="breakdown-label">余额支付：</span>
+                <span class="breakdown-value">¥{{ formatMoney(bill.balanceAmount) }}</span>
+              </div>
+              <div v-if="bill.otherPaymentAmount && bill.otherPaymentAmount > 0" class="payment-breakdown-item">
+                <span class="breakdown-label">其他支付：</span>
+                <span class="breakdown-value">¥{{ formatMoney(bill.otherPaymentAmount) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="amount-row total">
           <span class="label">应付金额</span>
           <span class="value total-amount">¥{{ formatMoney(bill.amountDetail?.totalAmount) }}</span>
@@ -113,7 +136,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getTableBill, endTable } from '@/api/table'
+import { getTableBill, endTable, PAYMENT_METHOD_LABELS } from '@/api/table'
 import type { BillInfo } from '@/api/table'
 
 /**
@@ -172,7 +195,11 @@ const handleConfirm = async () => {
 
   confirming.value = true
   try {
-    await endTable(props.tableId)
+    // 如果账单中有支付方式，则传递支付方式参数
+    const params = bill.value?.paymentMethod
+      ? { paymentMethod: bill.value.paymentMethod }
+      : undefined
+    await endTable(props.tableId, params)
     ElMessage.success('结账成功')
     emit('confirmed')
     emit('update:modelValue', false)
@@ -216,6 +243,10 @@ const formatDuration = (seconds: number) => {
 
 const formatMoney = (amount: number) => {
   return amount?.toFixed(2) || '0.00'
+}
+
+const getPaymentMethodLabel = (method: string) => {
+  return PAYMENT_METHOD_LABELS[method as keyof typeof PAYMENT_METHOD_LABELS] || method
 }
 </script>
 
@@ -272,6 +303,12 @@ const formatMoney = (amount: number) => {
 .info-row .value.highlight {
   color: #409eff;
   font-weight: 600;
+}
+
+.info-row .value.member-balance {
+  color: #67c23a;
+  font-weight: 600;
+  font-size: 16px;
 }
 
 .amount-row {
@@ -334,5 +371,56 @@ const formatMoney = (amount: number) => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.payment-method-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f0f9ff;
+  border: 1px solid #67c23a;
+  border-radius: 4px;
+}
+
+.payment-method-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #67c23a;
+  margin-bottom: 8px;
+}
+
+.payment-method-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.payment-method-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.payment-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-left: 12px;
+}
+
+.payment-breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.breakdown-label {
+  color: #606266;
+}
+
+.breakdown-value {
+  color: #409eff;
+  font-weight: 500;
 }
 </style>

@@ -3,6 +3,7 @@ package com.pindou.timer.service;
 import com.pindou.timer.dto.BillResponse;
 import com.pindou.timer.dto.EndTableRequest;
 import com.pindou.timer.dto.ExtendTableRequest;
+import com.pindou.timer.dto.ReservationRequest;
 import com.pindou.timer.dto.StartTimerRequest;
 import com.pindou.timer.dto.TableConfigRequest;
 import com.pindou.timer.dto.TableInfoResponse;
@@ -23,9 +24,10 @@ public interface TableService {
      *
      * @param status 状态筛选（可选）
      * @param categoryId 分类ID筛选（可选）
+     * @param name 桌台名称模糊搜索（可选）
      * @return 桌台信息列表
      */
-    List<TableInfoResponse> getTableList(String status, Long categoryId);
+    List<TableInfoResponse> getTableList(String status, Long categoryId, String name);
 
     /**
      * 更新桌台信息
@@ -123,4 +125,23 @@ public interface TableService {
      * @param tableIds 桌台编号列表
      */
     void batchDeleteTables(List<Integer> tableIds);
+
+    /**
+     * 创建桌台预定
+     *
+     * @param tableId 桌台编号
+     * @param request 预定请求
+     * @param userId 操作用户ID
+     * @param username 操作用户名
+     */
+    void createReservation(Integer tableId, ReservationRequest request, String userId, String username);
+
+    /**
+     * 取消桌台预定
+     *
+     * @param tableId 桌台编号
+     * @param userId 操作用户ID
+     * @param username 操作用户名
+     */
+    void cancelReservation(Integer tableId, String userId, String username);
 }

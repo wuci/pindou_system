@@ -2,6 +2,7 @@ D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRule.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LogInfoResponse.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRuleItemRequest.java
+D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ReservationRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LoginResponse.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\MemberQueryRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\common\result\ErrorCode.java

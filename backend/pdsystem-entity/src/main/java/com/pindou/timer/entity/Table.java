@@ -63,6 +63,22 @@ public class Table implements Serializable {
     @TableField("remind_ignored")
     private Integer remindIgnored;
 
+    @Schema(description = "预定状态：none-未预定，reserved-已预定")
+    @TableField("reservation_status")
+    private String reservationStatus;
+
+    @Schema(description = "预定截止时间（毫秒时间戳）")
+    @TableField("reservation_end_time")
+    private Long reservationEndTime;
+
+    @Schema(description = "预订人姓名")
+    @TableField("reservation_name")
+    private String reservationName;
+
+    @Schema(description = "预订人手机号")
+    @TableField("reservation_phone")
+    private String reservationPhone;
+
     @Schema(description = "创建时间（毫秒时间戳）")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Long createdAt;

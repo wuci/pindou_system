@@ -3,7 +3,8 @@
     class="table-card"
     :class="[
       `table-card--${table.status}`,
-      { 'table-card--near-expiry': isNearExpiry && !remindIgnored && !isOvertime }
+      { 'table-card--near-expiry': isNearExpiry && !remindIgnored && !isOvertime },
+      { 'table-card--overtime': isOverExtendedTime }
     ]"
     @click="$emit('click', table)"
   >
@@ -16,6 +17,33 @@
         <el-icon class="table-card__edit-icon" @click.stop="$emit('edit', table)">
           <Edit />
         </el-icon>
+        <!-- 预定按钮（放在名称右边，使用图标） -->
+        <template v-if="table.status === 'idle'">
+          <el-tooltip
+            v-if="table.reservationStatus === 'reserved'"
+            content="取消预定"
+            placement="top"
+          >
+            <el-icon
+              class="table-card__reserve-icon reserved"
+              @click.stop="$emit('cancelReservation', table)"
+            >
+              <Calendar />
+            </el-icon>
+          </el-tooltip>
+          <el-tooltip
+            v-else
+            content="预定"
+            placement="top"
+          >
+            <el-icon
+              class="table-card__reserve-icon"
+              @click.stop="$emit('reserve', table)"
+            >
+              <Calendar />
+            </el-icon>
+          </el-tooltip>
+        </template>
       </div>
       <div class="table-card__status">
         <el-tag :type="statusType" size="small">{{ statusText }}</el-tag>
@@ -26,12 +54,42 @@
     <div class="table-card__body">
       <!-- 空闲状态 -->
       <template v-if="table.status === 'idle'">
-        <div class="table-card__idle">
-          <el-icon :size="48" color="#67C23A">
-            <CircleCheck />
-          </el-icon>
-          <div class="table-card__idle-text">空闲中</div>
-        </div>
+        <!-- 已预定状态 -->
+        <template v-if="table.reservationStatus === 'reserved'">
+          <div class="table-card__reserved">
+            <div class="table-card__reserved-info">
+              <div class="table-card__reserved-header">
+                <el-icon :size="28" color="#E6A23C">
+                  <Clock />
+                </el-icon>
+                <span class="table-card__reserved-label">已预定</span>
+              </div>
+              <div class="table-card__reserved-details">
+                <div class="table-card__reserved-item">
+                  <span class="table-card__reserved-item-label">预订人：</span>
+                  <span class="table-card__reserved-item-value">{{ table.reservationName }}</span>
+                </div>
+                <div class="table-card__reserved-item">
+                  <span class="table-card__reserved-item-label">手机号：</span>
+                  <span class="table-card__reserved-item-value">{{ table.reservationPhone }}</span>
+                </div>
+                <div class="table-card__reserved-item" v-if="table.reservationEndTime">
+                  <span class="table-card__reserved-item-label">截止时间：</span>
+                  <span class="table-card__reserved-item-value">{{ formattedReservationEndTime }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <!-- 纯空闲状态 -->
+        <template v-else>
+          <div class="table-card__idle">
+            <el-icon :size="48" color="#67C23A">
+              <CircleCheck />
+            </el-icon>
+            <div class="table-card__idle-text">空闲中</div>
+          </div>
+        </template>
       </template>
 
       <!-- 使用中/暂停状态 -->
@@ -46,7 +104,7 @@
               </el-icon>
             </div>
             <div class="table-card__timer-value">{{ formattedRemainingDuration }}</div>
-            <div class="table-card__timer-label">剩余时长</div>
+            <div class="table-card__timer-label">{{ isInExtendTime ? '延长剩余' : '剩余时长' }}</div>
           </div>
 
           <!-- 费用显示 -->
@@ -127,7 +185,8 @@
     <!-- 桌台操作按钮 -->
     <div class="table-card__actions">
       <template v-if="table.status === 'idle'">
-        <el-button type="primary" size="small" @click.stop="$emit('start', table)">
+        <!-- 已预订状态不显示开始计时按钮 -->
+        <el-button v-if="table.reservationStatus !== 'reserved'" type="primary" size="small" @click.stop="$emit('start', table)">
           开始计时
         </el-button>
       </template>
@@ -166,7 +225,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Clock, CircleCheck, Edit } from '@element-plus/icons-vue'
+import { Clock, CircleCheck, Edit, Calendar } from '@element-plus/icons-vue'
 import type { TableInfo } from '@/api/table'
 
 interface Props {
@@ -187,6 +246,8 @@ const emit = defineEmits<{
   ignoreRemind: [table: TableInfo]
   edit: [table: TableInfo]
   extend: [table: TableInfo]
+  reserve: [table: TableInfo]
+  cancelReservation: [table: TableInfo]
 }>()
 
 // 状态类型
@@ -257,19 +318,43 @@ const remainingDuration = computed(() => {
   return Math.max(0, remaining)
 })
 
-// 格式化的剩余时长显示
-const formattedRemainingDuration = computed(() => {
-  if (remainingDuration.value === null) {
-    return '不设时长'
-  }
-  return formatDuration(remainingDuration.value)
-})
-
 // 计算延长时长配置（秒）- 系统配置的延长时间
 const extendedDuration = computed(() => {
   // 系统配置的延长时间（分钟转换为秒）
   const configExtendTimeSeconds = props.systemExtendTime * 60
   return configExtendTimeSeconds
+})
+
+// 判断是否在延长时间内（超过预设但未超过延长配置）
+const isInExtendTime = computed(() => {
+  if (!props.table.presetDuration) {
+    return false
+  }
+  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
+  return props.table.duration > props.table.presetDuration && props.table.duration <= totalAllowedTime
+})
+
+// 计算延长倒计时（延长时间剩余多少秒）
+const extendRemaining = computed(() => {
+  if (!props.table.presetDuration) {
+    return 0
+  }
+  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
+  const remaining = totalAllowedTime - props.table.duration
+  return Math.max(0, remaining)
+})
+
+// 格式化的剩余时长显示（在延长时间内时显示延长剩余时长）
+const formattedRemainingDuration = computed(() => {
+  // 如果在延长时间内，显示延长剩余时长
+  if (isInExtendTime.value) {
+    return formatDuration(extendRemaining.value)
+  }
+  // 否则显示正常的剩余时长
+  if (remainingDuration.value === null) {
+    return '不设时长'
+  }
+  return formatDuration(remainingDuration.value)
 })
 
 // 格式化的延长时长显示
@@ -293,15 +378,6 @@ const isOvertime = computed(() => {
   return props.table.duration > props.table.presetDuration
 })
 
-// 判断是否在延长时间内（超过预设但未超过延长配置）
-const isInExtendTime = computed(() => {
-  if (!props.table.presetDuration) {
-    return false
-  }
-  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
-  return props.table.duration > props.table.presetDuration && props.table.duration <= totalAllowedTime
-})
-
 // 判断是否超过延长配置时间
 const isOverExtendedTime = computed(() => {
   if (!props.table.presetDuration) {
@@ -309,16 +385,6 @@ const isOverExtendedTime = computed(() => {
   }
   const totalAllowedTime = props.table.presetDuration + extendedDuration.value
   return props.table.duration > totalAllowedTime
-})
-
-// 计算延长倒计时（延长时间剩余多少秒）
-const extendRemaining = computed(() => {
-  if (!props.table.presetDuration) {
-    return 0
-  }
-  const totalAllowedTime = props.table.presetDuration + extendedDuration.value
-  const remaining = totalAllowedTime - props.table.duration
-  return Math.max(0, remaining)
 })
 
 // 格式化的延长倒计时显示
@@ -387,6 +453,17 @@ const formatFullDateTime = (timestamp: number): string => {
   const seconds = date.getSeconds().toString().padStart(2, '0')
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
+
+// 格式化预定截止时间
+const formattedReservationEndTime = computed(() => {
+  if (!props.table.reservationEndTime) return ''
+  return formatDateTime(props.table.reservationEndTime)
+})
+
+// 判断是否已预定
+const isReserved = computed(() => {
+  return props.table.reservationStatus === 'reserved'
+})
 </script>
 
 <style scoped>
@@ -507,6 +584,34 @@ const formatFullDateTime = (timestamp: number): string => {
   transform: scale(1);
 }
 
+/* 预定图标（放在名称右边） */
+.table-card__reserve-icon {
+  color: #909399;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  margin-left: 8px;
+  opacity: 1;
+  font-size: 22px;
+  transform: scale(0.9);
+}
+
+.table-card__reserve-icon:hover {
+  background: rgba(230, 162, 60, 0.1);
+  color: #E6A23C;
+  transform: scale(1.1);
+}
+
+.table-card__reserve-icon.reserved {
+  color: #F56C6C;
+}
+
+.table-card__reserve-icon.reserved:hover {
+  background: rgba(245, 108, 108, 0.1);
+  color: #F56C6C;
+}
+
 /* 内容区域 */
 .table-card__body {
   padding: 12px 16px;
@@ -529,6 +634,60 @@ const formatFullDateTime = (timestamp: number): string => {
   margin-top: 10px;
   font-size: 15px;
   color: #67C23A;
+  font-weight: 500;
+}
+
+/* 预定状态 */
+.table-card__reserved {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 8px;
+}
+
+.table-card__reserved-info {
+  width: 100%;
+  background: rgba(230, 162, 60, 0.1);
+  border: 1px dashed #E6A23C;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.table-card__reserved-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #E6A23C;
+}
+
+.table-card__reserved-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #E6A23C;
+}
+
+.table-card__reserved-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.table-card__reserved-item {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.table-card__reserved-item-label {
+  color: #909399;
+  min-width: 70px;
+}
+
+.table-card__reserved-item-value {
+  color: #303133;
   font-weight: 500;
 }
 

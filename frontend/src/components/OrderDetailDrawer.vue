@@ -28,8 +28,12 @@
             <span class="value">{{ detail.operatorName }}</span>
           </div>
           <div class="info-item">
-            <span class="label">预设时长</span>
+            <span class="label">套餐时长</span>
             <span class="value">{{ detail.presetDuration ? formatDuration(detail.presetDuration) : '不设时长' }}</span>
+          </div>
+          <div v-if="detail.channel" class="info-item">
+            <span class="label">渠道</span>
+            <el-tag type="primary" size="small">{{ getChannelName(detail.channel) }}</el-tag>
           </div>
         </div>
       </section>
@@ -137,10 +141,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { getOrderDetail } from '@/api/order'
 import type { OrderDetail } from '@/api/order'
 import { ElMessage } from 'element-plus'
+import { useChannelTranslation } from '@/composables/useChannelTranslation'
+
+// 渠道翻译
+const { loadBillingRules, getChannelName } = useChannelTranslation()
+
+// 初始化
+onMounted(async () => {
+  await loadBillingRules()
+})
 
 /**
  * 订单详情抽屉组件

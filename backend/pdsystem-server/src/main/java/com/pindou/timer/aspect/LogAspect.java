@@ -2,8 +2,10 @@ package com.pindou.timer.aspect;
 
 import cn.hutool.json.JSONUtil;
 import com.pindou.timer.annotation.LogOperation;
+import com.pindou.timer.dto.UserInfo;
 import com.pindou.timer.entity.OperationLog;
 import com.pindou.timer.mapper.OperationLogMapper;
+import com.pindou.timer.service.UserService;
 import com.pindou.timer.util.IpUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -12,6 +14,13 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.core.DefaultParameterNameDiscoverer;
+import org.springframework.core.ParameterNameDiscoverer;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -20,9 +29,6 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 /**
  * 操作日志AOP切面
@@ -37,17 +43,25 @@ import java.util.concurrent.Executors;
 public class LogAspect {
 
     /**
-     * 异步线程池
+     * SpEL 表达式解析器
      */
-    private static final Executor executor = Executors.newFixedThreadPool(5);
+    private final ExpressionParser parser = new SpelExpressionParser();
+
+    /**
+     * 参数名称发现器
+     */
+    private final ParameterNameDiscoverer nameDiscoverer = new DefaultParameterNameDiscoverer();
 
     @Resource
     private OperationLogMapper operationLogMapper;
 
+    @Resource
+    private UserService userService;
+
     /**
-     * 定义切点
+     * 定义切点 - 使用 execution 匹配所有 Controller 方法
      */
-    @Pointcut("@annotation(com.pindou.timer.annotation.LogOperation)")
+    @Pointcut("execution(* com.pindou.timer.controller..*.*(..))")
     public void logPointcut() {
     }
 
@@ -60,31 +74,23 @@ public class LogAspect {
         Object result = null;
         Exception exception = null;
 
+        // 记录方法调用
+        log.info("LogAspect: 拦截到方法调用 - {}", point.getSignature().toShortString());
+
         try {
             // 执行方法
             result = point.proceed();
             return result;
         } catch (Exception e) {
             exception = e;
+            log.error("LogAspect: 方法执行异常 - {}", point.getSignature().toShortString(), e);
             throw e;
         } finally {
             long duration = System.currentTimeMillis() - beginTime;
-            // 异步保存日志
-            saveLogAsync(point, result, exception, duration);
+            log.info("LogAspect: 方法执行完成 - {}, 耗时{}ms", point.getSignature().toShortString(), duration);
+            // 同步保存日志（避免异步导致 RequestContextHolder 丢失）
+            saveLog(point, result, exception, duration);
         }
-    }
-
-    /**
-     * 异步保存日志
-     */
-    private void saveLogAsync(ProceedingJoinPoint point, Object result, Exception exception, long duration) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                saveLog(point, result, exception, duration);
-            } catch (Exception e) {
-                log.error("保存操作日志失败", e);
-            }
-        }, executor);
     }
 
     /**
@@ -93,15 +99,30 @@ public class LogAspect {
     private void saveLog(ProceedingJoinPoint point, Object result, Exception exception, long duration) {
         MethodSignature signature = (MethodSignature) point.getSignature();
         Method method = signature.getMethod();
-        LogOperation logAnnotation = method.getAnnotation(LogOperation.class);
+
+        // 由于可能使用 CGLIB 代理，需要从目标类获取方法
+        Class<?> targetClass = point.getTarget().getClass();
+        LogOperation logAnnotation = null;
+
+        try {
+            // 从目标类获取方法（处理 CGLIB 代理）
+            Method targetMethod = targetClass.getMethod(method.getName(), method.getParameterTypes());
+            logAnnotation = targetMethod.getAnnotation(LogOperation.class);
+        } catch (NoSuchMethodException e) {
+            log.warn("无法找到目标方法：{}", method.getName());
+        }
 
         if (logAnnotation == null) {
+            // 没有注解，不需要记录日志
             return;
         }
+
+        log.info("记录操作日志：module={}, operation={}", logAnnotation.module(), logAnnotation.operation());
 
         // 获取请求信息
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
+            log.warn("无法获取 ServletRequestAttributes");
             return;
         }
 
@@ -112,7 +133,15 @@ public class LogAspect {
         operationLog.setId(UUID.randomUUID().toString().replace("-", ""));
         operationLog.setModule(logAnnotation.module());
         operationLog.setOperation(logAnnotation.operation());
-        operationLog.setDescription(logAnnotation.description());
+        // 手动设置创建时间（解决 MyBatis-Plus FieldFill.INSERT 不生效的问题）
+        operationLog.setCreatedAt(System.currentTimeMillis());
+
+        // 解析 SpEL 表达式
+        String description = parseSpEL(logAnnotation.description(), point, targetClass);
+        operationLog.setDescription(description);
+        // 设置 content 字段（兼容旧表结构）
+        operationLog.setContent(description);
+
         operationLog.setMethod(request.getMethod() + " " + request.getRequestURI());
         operationLog.setDuration(duration);
 
@@ -155,15 +184,86 @@ public class LogAspect {
             operationLog.setStatus(1);
         }
 
-        // TODO: 从Token或Session中获取用户信息
-        // operationLog.setUserId(...);
-        // operationLog.setUsername(...);
+        // 从Token中获取用户信息
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (StringUtils.isNotBlank(authHeader) && authHeader.length() > 7) {
+                String token = authHeader.substring(7);
+                String userId = userService.getUserIdFromToken(token);
+                if (StringUtils.isNotBlank(userId)) {
+                    operationLog.setUserId(userId);
+                    // 获取用户名
+                    try {
+                        UserInfo userInfo = userService.getUserInfo(userId);
+                        if (userInfo != null) {
+                            operationLog.setUsername(userInfo.getNickname());
+                        }
+                    } catch (Exception e) {
+                        // 获取用户名失败，使用 userId 作为用户名
+                        operationLog.setUsername(userId);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("从Token获取用户信息失败", e);
+        }
 
         // 保存日志
         try {
             operationLogMapper.insert(operationLog);
+            log.info("操作日志保存成功：id={}, module={}, operation={}",
+                operationLog.getId(), operationLog.getModule(), operationLog.getOperation());
         } catch (Exception e) {
             log.error("保存操作日志到数据库失败", e);
         }
+    }
+
+    /**
+     * 解析 SpEL 表达式
+     */
+    private String parseSpEL(String spel, ProceedingJoinPoint point, Class<?> targetClass) {
+        if (StringUtils.isBlank(spel)) {
+            return "";
+        }
+
+        // 如果不包含 SpEL 表达式标记（# 或 $），直接返回原字符串
+        if (!spel.contains("#") && !spel.contains("$")) {
+            return spel;
+        }
+
+        try {
+            MethodSignature signature = (MethodSignature) point.getSignature();
+            Method method = signature.getMethod();
+
+            // 获取目标类的方法
+            Method targetMethod = targetClass.getMethod(method.getName(), method.getParameterTypes());
+
+            // 获取方法参数名和值
+            String[] parameterNames = nameDiscoverer.getParameterNames(targetMethod);
+            Object[] args = point.getArgs();
+
+            // 创建 SpEL 上下文
+            EvaluationContext context = new StandardEvaluationContext();
+
+            // 设置参数到上下文
+            if (parameterNames != null) {
+                for (int i = 0; i < parameterNames.length; i++) {
+                    context.setVariable(parameterNames[i], args[i]);
+                }
+            }
+
+            // 解析表达式
+            Expression expression = parser.parseExpression(spel);
+            Object value = expression.getValue(context);
+
+            if (value != null) {
+                return value.toString();
+            }
+        } catch (Exception e) {
+            log.warn("解析 SpEL 表达式失败：{}", spel, e);
+        }
+
+        // 解析失败，返回原始字符串
+        return spel;
     }
 }

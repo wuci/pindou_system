@@ -14,33 +14,75 @@
 
       <!-- 当前状态 -->
       <el-form-item label="当前状态">
-        <div class="current-status">
-          <div v-if="table?.presetDuration">
-            <span>预设时长：</span>
-            <span class="status-value">{{ formatDuration(table.presetDuration) }}</span>
-          </div>
-          <div v-if="remainingTime > 0">
-            <span>剩余时长：</span>
-            <span class="status-value remaining">{{ formatDuration(remainingTime) }}</span>
-          </div>
-          <div v-if="table?.duration">
-            <span>已用时长：</span>
-            <span class="status-value">{{ formatDuration(table.duration) }}</span>
-          </div>
+        <div class="current-status-inline">
+          <span v-if="table?.presetDuration">
+            套餐：<span class="value">{{ formatDuration(table.presetDuration) }}</span>
+          </span>
+          <span v-if="remainingTime > 0">
+            剩余：<span class="value green">{{ formatDuration(remainingTime) }}</span>
+          </span>
+          <span v-if="table?.duration">
+            已用：<span class="value">{{ formatDuration(table.duration) }}</span>
+          </span>
         </div>
       </el-form-item>
 
+      <!-- 会员信息 -->
+      <el-form-item label="会员">
+        <!-- 桌台已有会员：直接展示会员信息 -->
+        <div v-if="isMemberLocked && selectedMember" class="member-info-detail">
+          <div class="member-info-row">
+            <span class="member-name-inline">{{ selectedMember.name }}</span>
+            <el-tag type="success" size="small">{{ selectedMember.levelName || '会员' }}</el-tag>
+            <span class="discount-rate-inline">{{ (selectedMember.discountRate * 10).toFixed(1) }}折</span>
+          </div>
+          <div class="member-info-row">
+            <span class="member-balance-label">会员余额：</span>
+            <span class="member-balance-value">¥{{ selectedMember.balance.toFixed(2) }}</span>
+          </div>
+        </div>
+        <!-- 桌台无会员：允许选择会员 -->
+        <template v-else>
+          <div class="member-selection-inline">
+            <el-switch
+              v-model="isMember"
+              active-text="会员"
+              inactive-text="非会员"
+              @change="handleMemberToggle"
+            />
+            <el-button
+              v-if="isMember"
+              type="primary"
+              size="small"
+              @click="showMemberDialog"
+              style="margin-left: 12px"
+            >
+              {{ selectedMember ? selectedMember.name : '选择会员' }}
+            </el-button>
+            <div v-if="selectedMember" class="member-info-detail">
+              <div class="member-info-row">
+                <el-tag type="success" size="small">{{ selectedMember.levelName || '会员' }}</el-tag>
+                <span style="margin-left: 8px;">{{ (selectedMember.discountRate * 10).toFixed(1) }}折</span>
+              </div>
+              <div class="member-info-row">
+                <span class="member-balance-label">会员余额：</span>
+                <span class="member-balance-value">¥{{ selectedMember.balance.toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </el-form-item>
+
       <!-- 渠道选择 -->
-      <el-form-item label="订餐渠道">
-        <el-radio-group v-model="selectedChannel" @change="handleChannelChange">
-          <el-radio
+      <el-form-item label="套餐类型">
+        <el-select v-model="selectedChannel" placeholder="请选择套餐类型" @change="handleChannelChange" style="width: 100%">
+          <el-option
             v-for="channel in billingRules?.channels || []"
             :key="channel.channel"
+            :label="channel.channelName"
             :value="channel.channel"
-          >
-            {{ channel.channelName }}
-          </el-radio>
-        </el-radio-group>
+          />
+        </el-select>
       </el-form-item>
 
       <!-- 续费时长选择 -->
@@ -58,6 +100,70 @@
             </span>
           </el-radio>
         </el-radio-group>
+      </el-form-item>
+
+      <!-- 费用信息 -->
+      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="费用">
+        <div class="extend-price-summary-inline">
+          <!-- 当前订单费用 -->
+          <div class="price-item-inline">
+            <span class="price-title">当前订单：</span>
+            <span class="price-value-inline">¥{{ currentOrderOriginalAmount.toFixed(2) }}</span>
+            <span v-if="selectedMember && memberDiscount > 0" class="price-final">
+              → <span class="discount">¥{{ (currentOrderOriginalAmount * memberDiscount).toFixed(2) }}</span>
+            </span>
+            <span v-if="table?.originalAmount && table.originalAmount < table.amount" class="price-paid">
+              (已付¥{{ currentOrderAmount.toFixed(2) }})
+            </span>
+          </div>
+
+          <!-- 续费费用 -->
+          <div class="price-item-inline">
+            <span class="price-title">本次续费：</span>
+            <span class="price-value-inline">¥{{ extendOriginalPrice.toFixed(2) }}</span>
+            <span v-if="selectedMember && memberDiscount > 0" class="price-final">
+              → <span class="discount">¥{{ extendFinalPrice.toFixed(2) }}</span>
+            </span>
+          </div>
+
+          <!-- 合计 -->
+          <div class="price-item-inline total">
+            <span class="price-title">合计：</span>
+            <span class="price-value-inline total">¥{{ totalOriginalAmount.toFixed(2) }}</span>
+            <span v-if="selectedMember" class="price-final">
+              → <span class="discount">¥{{ totalFinalAmount.toFixed(2) }}</span>
+              <span v-if="memberDiscount > 0" class="discount-tag-inline">
+                ({{ (memberDiscount * 10).toFixed(1) }}折)
+              </span>
+            </span>
+          </div>
+        </div>
+      </el-form-item>
+
+      <!-- 支付方式选择 -->
+      <el-form-item label="支付方式">
+        <el-select
+          v-model="selectedPaymentMethod"
+          placeholder="请选择支付方式"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="method in availablePaymentMethods"
+            :key="method.value"
+            :label="method.label"
+            :value="method.value"
+          >
+            <div class="payment-option-content">
+              <span class="payment-option-label">{{ method.label }}</span>
+              <span v-if="method.description" class="payment-option-description">{{ method.description }}</span>
+            </div>
+          </el-option>
+        </el-select>
+        <!-- 组合支付信息提示 -->
+        <div v-if="selectedPaymentMethod === 'combined' && combinedPaymentInfo" class="combined-payment-info">
+          <el-icon><InfoFilled /></el-icon>
+          <span>{{ combinedPaymentInfo.description }}</span>
+        </div>
       </el-form-item>
 
       <!-- 自定义时长输入 -->
@@ -108,16 +214,25 @@
         </el-button>
       </div>
     </template>
+
+    <!-- 会员选择弹窗 -->
+    <MemberSelectDialog
+      v-model="memberDialogVisible"
+      @selected="handleMemberSelected"
+    />
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import type { TableInfo } from '@/api/table'
-import { extendTable } from '@/api/table'
+import { extendTable, NON_MEMBER_PAYMENT_METHODS, MEMBER_PAYMENT_METHODS, type PaymentMethod } from '@/api/table'
 import { getBillingRuleConfig, type BillingRule, type BillingRuleItem } from '@/api/config'
+import type { MemberInfo } from '@/api/member'
+import MemberSelectDialog from '@/components/MemberSelectDialog.vue'
 
 interface Props {
   modelValue: boolean
@@ -139,6 +254,46 @@ const loadingRules = ref(false)
 // 标志：是否正在初始化
 const isInitializing = ref(false)
 
+// 会员相关
+const isMember = ref(false)
+const selectedMember = ref<MemberInfo | null>(null)
+const memberDialogVisible = ref(false)
+
+// 支付方式
+const selectedPaymentMethod = ref<PaymentMethod>('offline')
+
+// 可用的支付方式列表
+const availablePaymentMethods = computed(() => {
+  return isMember.value ? MEMBER_PAYMENT_METHODS : NON_MEMBER_PAYMENT_METHODS
+})
+
+// 组合支付信息计算
+const combinedPaymentInfo = computed(() => {
+  if (selectedPaymentMethod.value !== 'combined' || !selectedMember.value) {
+    return null
+  }
+  const balance = selectedMember.value.balance || 0
+  const totalAmount = totalFinalAmount.value || totalOriginalAmount.value || 0
+  if (balance >= totalAmount) {
+    return {
+      balanceAmount: totalAmount,
+      otherAmount: 0,
+      description: '余额充足，全部使用余额支付'
+    }
+  } else {
+    return {
+      balanceAmount: balance,
+      otherAmount: totalAmount - balance,
+      description: `余额${balance.toFixed(2)}元 + 线下${(totalAmount - balance).toFixed(2)}元`
+    }
+  }
+})
+
+// 判断会员是否被锁定（桌台已有会员，不允许修改）
+const isMemberLocked = computed(() => {
+  return !!props.table?.memberId
+})
+
 // 表单数据
 const form = ref({
   additionalDuration: 0, // 秒
@@ -147,7 +302,7 @@ const form = ref({
 
 // 计费规则数据
 const billingRules = ref<BillingRule | null>(null)
-const selectedChannel = ref<string>('store')
+const selectedChannel = ref<string>('')
 
 // 选中的规则索引或特殊值
 const selectedRuleIndex = ref<number | 'custom' | 'unlimited'>(0)
@@ -226,11 +381,11 @@ const extensionPreview = computed(() => {
   const minutes = Math.floor((newPresetDuration % 3600) / 60)
 
   if (hours > 0 && minutes > 0) {
-    return `总预设时长: ${hours}小时${minutes}分钟`
+    return `总套餐时长: ${hours}小时${minutes}分钟`
   } else if (hours > 0) {
-    return `总预设时长: ${hours}小时`
+    return `总套餐时长: ${hours}小时`
   } else {
-    return `总预设时长: ${minutes}分钟`
+    return `总套餐时长: ${minutes}分钟`
   }
 })
 
@@ -239,6 +394,61 @@ const currentRules = computed(() => {
   if (!billingRules.value || !billingRules.value.channels || !Array.isArray(billingRules.value.channels)) return []
   const channel = billingRules.value.channels.find(c => c.channel === selectedChannel.value)
   return channel?.rules || []
+})
+
+// 会员折扣率
+const memberDiscount = computed(() => {
+  return selectedMember.value?.discountRate || 0
+})
+
+// 当前选择的价格
+const currentRulePrice = computed(() => {
+  if (typeof selectedRuleIndex.value === 'number') {
+    const rule = currentRules.value[selectedRuleIndex.value]
+    return rule?.price || 0
+  }
+  return 0
+})
+
+// 原价
+const originalPrice = computed(() => {
+  return currentRulePrice.value
+})
+
+// 当前订单原价
+const currentOrderOriginalAmount = computed(() => {
+  return props.table?.originalAmount || props.table?.amount || 0
+})
+
+// 当前订单实付
+const currentOrderAmount = computed(() => {
+  return props.table?.amount || 0
+})
+
+// 续费原价
+const extendOriginalPrice = computed(() => {
+  return originalPrice.value
+})
+
+// 续费折后价
+const extendFinalPrice = computed(() => {
+  if (selectedMember.value && memberDiscount.value > 0) {
+    return extendOriginalPrice.value * memberDiscount.value
+  }
+  return extendOriginalPrice.value
+})
+
+// 总原价（当前订单原价 + 续费原价）
+const totalOriginalAmount = computed(() => {
+  return currentOrderOriginalAmount.value + extendOriginalPrice.value
+})
+
+// 总折后价（对总原价计算会员折扣）
+const totalFinalAmount = computed(() => {
+  if (selectedMember.value && memberDiscount.value > 0) {
+    return totalOriginalAmount.value * memberDiscount.value
+  }
+  return totalOriginalAmount.value
 })
 
 // 加载计费规则
@@ -279,15 +489,9 @@ const loadBillingRules = async () => {
 
     billingRules.value = parsed
 
-    // 设置当前选中的渠道
-    const currentChannelExists = parsed.channels.some((c: any) => c.channel === selectedChannel.value)
-    if (!currentChannelExists && parsed.channels.length > 0) {
-      selectedChannel.value = parsed.channels[0].channel
-    }
-
     await nextTick()
 
-    // 默认选中第一个规则
+    // 默认选中第一个规则（注意：不在这里设置渠道，由 initializeForm 设置）
     if (currentRules.value.length > 0) {
       selectedRuleIndex.value = 0
     } else {
@@ -359,7 +563,48 @@ const initializeForm = () => {
     remark: ''
   }
 
-  selectedChannel.value = 'store'
+  // 初始化会员信息
+  isMember.value = false
+  selectedMember.value = null
+
+  // 重置支付方式为默认值
+  selectedPaymentMethod.value = 'offline'
+
+  // 如果桌台已有会员信息，自动设置会员（锁定状态）
+  if (props.table?.memberId && props.table?.memberName) {
+    isMember.value = true
+    selectedMember.value = {
+      id: props.table.memberId,
+      name: props.table.memberName,
+      phone: '',
+      address: '',
+      totalAmount: 0,
+      balance: props.table.memberBalance || 0,
+      levelId: 0,
+      levelName: '',
+      discountRate: props.table.memberDiscountRate || 1,
+      createdAt: 0,
+      updatedAt: 0
+    }
+    console.log('自动设置会员（续费，已锁定）:', selectedMember.value)
+  }
+
+  // 使用当前桌台的渠道，如果桌台有渠道且该渠道在计费规则中存在，则使用它
+  // 否则使用第一条渠道，最后兜底使用 'store'
+  let targetChannel = props.table?.channel || 'store'
+
+  // 检查目标渠道是否在计费规则中存在
+  const channelExists = billingRules.value?.channels?.some((c: any) => c.channel === targetChannel)
+
+  if (channelExists) {
+    selectedChannel.value = targetChannel
+    console.log('初始化续费表单，使用桌台渠道:', targetChannel)
+  } else {
+    // 使用第一条渠道
+    const firstChannel = billingRules.value?.channels?.[0]?.channel
+    selectedChannel.value = firstChannel || 'store'
+    console.log('初始化续费表单，桌台渠道', targetChannel, '不在计费规则中，使用第一条渠道:', selectedChannel.value)
+  }
 
   nextTick(() => {
     if (currentRules.value.length > 0) {
@@ -387,7 +632,32 @@ const resetForm = () => {
     additionalDuration: 0,
     remark: ''
   }
-  selectedChannel.value = 'store'
+
+  // 重置会员选择
+  isMember.value = false
+  selectedMember.value = null
+
+  // 如果桌台已有会员信息，自动设置会员（锁定状态）
+  if (props.table?.memberId && props.table?.memberName) {
+    isMember.value = true
+    selectedMember.value = {
+      id: props.table.memberId,
+      name: props.table.memberName,
+      phone: '',
+      address: '',
+      totalAmount: 0,
+      balance: props.table.memberBalance || 0,
+      levelId: 0,
+      levelName: '',
+      discountRate: props.table.memberDiscountRate || 1,
+      createdAt: 0,
+      updatedAt: 0
+    }
+    console.log('自动设置会员（续费，已锁定）:', selectedMember.value)
+  }
+
+  const defaultChannel = props.table?.channel || 'store'
+  selectedChannel.value = defaultChannel
   nextTick(() => {
     if (currentRules.value.length > 0) {
       customHours.value = 1
@@ -438,7 +708,9 @@ const handleConfirm = async () => {
   try {
     await extendTable(props.table.id, {
       additionalDuration,
-      channel: selectedChannel.value
+      channel: selectedChannel.value,
+      memberId: selectedMember.value?.id,
+      paymentMethod: selectedPaymentMethod.value
     })
 
     ElMessage.success('续费成功')
@@ -462,6 +734,42 @@ onMounted(() => {
 defineExpose({
   reset: resetForm
 })
+
+// 会员切换处理
+const handleMemberToggle = (value: boolean) => {
+  // 如果会员被锁定（桌台已有会员），不允许切换
+  if (isMemberLocked.value) {
+    // 恢复为会员状态
+    isMember.value = true
+    ElMessage.warning('当前订单已绑定会员，无法修改')
+    return
+  }
+
+  if (!value) {
+    selectedMember.value = null
+  } else {
+    // 切换到会员时，自动弹出会员选择对话框
+    showMemberDialog()
+  }
+  // 切换会员状态时，重置支付方式为默认值
+  selectedPaymentMethod.value = 'offline'
+}
+
+// 显示会员选择对话框
+const showMemberDialog = () => {
+  // 如果会员被锁定（桌台已有会员），不允许更换会员
+  if (isMemberLocked.value) {
+    ElMessage.warning('当前订单已绑定会员，无法更换')
+    return
+  }
+  memberDialogVisible.value = true
+}
+
+// 会员选择回调
+const handleMemberSelected = (member: MemberInfo) => {
+  selectedMember.value = member
+  ElMessage.success(`已选择会员：${member.name}`)
+}
 </script>
 
 <style scoped>
@@ -469,6 +777,28 @@ defineExpose({
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.current-status-inline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.current-status-inline span {
+  font-size: 14px;
+  color: #606266;
+}
+
+.current-status-inline .value {
+  font-weight: 600;
+  color: #303133;
+  margin-left: 4px;
+}
+
+.current-status-inline .value.green {
+  color: #67c23a;
 }
 
 .current-status {
@@ -558,5 +888,272 @@ defineExpose({
 
 :deep(.el-input-number) {
   width: 100%;
+}
+
+/* 价格显示样式 */
+.price-display-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.price-item-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.price-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.price-original {
+  font-size: 16px;
+  color: #909399;
+  text-decoration: line-through;
+  font-weight: 400;
+}
+
+.price-discount {
+  font-size: 18px;
+  color: #409eff;
+  font-weight: 600;
+}
+
+.discount-tag {
+  font-size: 12px;
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.price-normal {
+  font-size: 18px;
+  color: #409eff;
+  font-weight: 600;
+}
+
+/* 续费费用汇总样式 - 紧凑版 */
+.extend-price-summary-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.price-item-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.price-item-inline.total {
+  background: #ecf5ff;
+  border: 1px solid #409eff;
+}
+
+.price-title {
+  color: #606266;
+  font-weight: 500;
+}
+
+.price-value-inline {
+  font-weight: 600;
+  color: #303133;
+  font-size: 15px;
+}
+
+.price-value-inline.total {
+  color: #409eff;
+  font-size: 16px;
+}
+
+.price-paid {
+  color: #909399;
+  font-size: 13px;
+}
+
+.price-final {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.price-final .discount {
+  color: #67c23a;
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.discount-tag-inline {
+  color: #67c23a;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 续费费用汇总样式 - 旧版（保留兼容） */
+.extend-price-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.price-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.price-section.highlight {
+  background: #ecf5ff;
+  border-color: #409eff;
+}
+
+.price-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.price-section-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.price-section .price-value {
+  font-weight: 600;
+  color: #303133;
+}
+
+.price-section.highlight .price-value {
+  color: #409eff;
+  font-size: 16px;
+}
+
+.price-section.highlight .price-value.discount {
+  color: #67c23a;
+  font-size: 18px;
+}
+
+/* 会员信息展示样式 - 紧凑版 */
+.member-info-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-name-inline {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.discount-rate-inline {
+  font-size: 14px;
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.member-selection-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 会员信息展示样式 - 旧版（保留兼容） */
+.member-info-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.member-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.member-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discount-rate {
+  font-size: 14px;
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.payment-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.payment-option-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.payment-option-description {
+  font-size: 12px;
+  color: #909399;
+}
+
+.combined-payment-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #67c23a;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #67c23a;
+}
+
+.combined-payment-info .el-icon {
+  font-size: 16px;
+}
+
+.member-info-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.member-info-row {
+  display: flex;
+  align-items: center;
+  color: #67c23a;
+}
+
+.member-balance-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.member-balance-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #409eff;
+  margin-left: 4px;
 }
 </style>

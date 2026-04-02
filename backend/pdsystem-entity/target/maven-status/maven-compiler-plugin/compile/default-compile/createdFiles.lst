@@ -4,6 +4,7 @@ com\pindou\timer\dto\MemberInfo.class
 com\pindou\timer\dto\MemberLevelResponse.class
 com\pindou\timer\dto\RoleInfoResponse.class
 com\pindou\timer\dto\BillingRuleConfigRequest.class
+com\pindou\timer\dto\ReservationRequest.class
 com\pindou\timer\entity\Order.class
 com\pindou\timer\dto\OrderDetailResponse.class
 com\pindou\timer\dto\LogQueryRequest.class

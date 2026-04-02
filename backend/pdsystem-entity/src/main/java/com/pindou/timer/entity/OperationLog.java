@@ -76,6 +76,18 @@ public class OperationLog implements Serializable {
     @TableField("error_msg")
     private String errorMsg;
 
+    @Schema(description = "操作内容（兼容旧表结构的 content 字段）")
+    @TableField("content")
+    private String content;
+
+    @Schema(description = "目标类型")
+    @TableField("target_type")
+    private String targetType;
+
+    @Schema(description = "目标ID")
+    @TableField("target_id")
+    private String targetId;
+
     @Schema(description = "操作时间（毫秒时间戳）")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Long createdAt;

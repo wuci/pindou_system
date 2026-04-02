@@ -223,11 +223,12 @@ public class OrderServiceImpl implements OrderService {
 
             log.info("使用订单存储金额: orderId={}, amount={}", order.getId(), order.getAmount().doubleValue());
         } else {
-            // 计算当前费用
+            // 计算当前费用，使用订单中存储的渠道
             int actualDuration = order.getDuration() - order.getPauseDuration();
-            AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
+            String orderChannel = order.getChannel() != null ? order.getChannel() : "store";
+            AmountDetail amountDetail = billingService.calculateAmount(orderChannel, actualDuration, order.getPresetDuration());
             response.setAmount(amountDetail.getTotalAmount());
-            log.info("重新计算订单金额: orderId={}, amount={}", order.getId(), amountDetail.getTotalAmount());
+            log.info("重新计算订单金额: orderId={}, channel={}, amount={}", order.getId(), orderChannel, amountDetail.getTotalAmount());
         }
 
         // 填充会员信息
@@ -269,6 +270,7 @@ public class OrderServiceImpl implements OrderService {
         response.setId(order.getId());
         response.setTableId(order.getTableId());
         response.setTableName(order.getTableName());
+        response.setChannel(order.getChannel());
         response.setStartTime(order.getStartTime());
         response.setEndTime(order.getEndTime());
         response.setPaidAt(order.getPaidAt());
@@ -315,11 +317,13 @@ public class OrderServiceImpl implements OrderService {
                     log.info("使用订单存储的金额明细: orderId={}, amount={}", order.getId(), order.getAmount().doubleValue());
                 } catch (Exception e) {
                     log.warn("解析金额明细失败，重新计算: orderId={}, amountDetail={}", order.getId(), order.getAmountDetail());
-                    // 解析失败，重新计算
-                    AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
+                    // 解析失败，重新计算，使用订单中存储的渠道
+                    String orderChannel = order.getChannel() != null ? order.getChannel() : "store";
+                    AmountDetail amountDetail = billingService.calculateAmount(orderChannel, actualDuration, order.getPresetDuration());
                     response.setNormalAmount(amountDetail.getNormalAmount());
                     response.setOvertimeAmount(amountDetail.getOvertimeAmount());
                     response.setAmountDetailInfo(amountDetail);
+                    log.info("使用渠道 {} 重新计算订单金额明细: orderId={}, amount={}", orderChannel, order.getId(), amountDetail.getTotalAmount());
                 }
             } else {
                 // 没有金额明细，使用订单金额创建简单的明细
@@ -336,11 +340,13 @@ public class OrderServiceImpl implements OrderService {
                 response.setAmountDetailInfo(amountDetail);
             }
         } else {
-            // 订单没有金额，重新计算
-            AmountDetail amountDetail = billingService.calculateAmount(actualDuration, order.getPresetDuration());
+            // 订单没有金额，重新计算，使用订单中存储的渠道
+            String orderChannel = order.getChannel() != null ? order.getChannel() : "store";
+            AmountDetail amountDetail = billingService.calculateAmount(orderChannel, actualDuration, order.getPresetDuration());
             response.setNormalAmount(amountDetail.getNormalAmount());
             response.setOvertimeAmount(amountDetail.getOvertimeAmount());
             response.setAmount(amountDetail.getTotalAmount());
+            log.info("使用渠道 {} 重新计算订单金额: orderId={}, amount={}", orderChannel, order.getId(), amountDetail.getTotalAmount());
             response.setAmountDetailInfo(amountDetail);
             log.info("重新计算订单金额: orderId={}, amount={}", order.getId(), amountDetail.getTotalAmount());
         }

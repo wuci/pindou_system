@@ -6,6 +6,17 @@
         <div class="header__main">
           <h2 class="header__title">桌台管理</h2>
           <div class="header__actions">
+            <!-- 搜索框 -->
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索桌台名称"
+              :prefix-icon="Search"
+              clearable
+              size="small"
+              style="width: 200px; margin-right: 8px"
+              @input="handleSearch"
+              @clear="handleSearch"
+            />
             <!-- 批量操作按钮 -->
             <template v-if="batchSelectionMode">
               <span class="selected-count">已选择 {{ selectedTableIds.size }} 个桌台</span>
@@ -72,6 +83,8 @@
       @edit="handleEdit"
       @select="handleTableSelect"
       @batch-delete="handleBatchDelete"
+      @reserve="handleReserve"
+      @cancelReservation="handleCancelReservation"
     />
 
     <!-- 开始计时对话框 -->
@@ -91,6 +104,13 @@
     <!-- 续费对话框 -->
     <ExtendDialog
       v-model="showExtendDialog"
+      :table="selectedTable"
+      @success="refreshTables"
+    />
+
+    <!-- 预定对话框 -->
+    <ReservationDialog
+      v-model="showReservationDialog"
       :table="selectedTable"
       @success="refreshTables"
     />
@@ -123,14 +143,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Setting, Refresh, Delete } from '@element-plus/icons-vue'
+import { Setting, Refresh, Delete, Search } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { getTableList, batchDeleteTables, type TableInfo } from '@/api/table'
+import { getTableList, batchDeleteTables, cancelReservation, type TableInfo } from '@/api/table'
 import { getCategories, type TableCategoryResponse } from '@/api/tableCategory'
 import TableLayoutEditor from '@/components/TableLayoutEditor.vue'
 import StartTimerDialog from '@/components/StartTimerDialog.vue'
 import BillDialog from '@/components/BillDialog.vue'
 import ExtendDialog from '@/components/ExtendDialog.vue'
+import ReservationDialog from '@/components/ReservationDialog.vue'
 import TableConfigDialog from './components/TableConfigDialog.vue'
 import EditTableDialog from './components/EditTableDialog.vue'
 import CategoryDialog from './components/CategoryDialog.vue'
@@ -147,9 +168,11 @@ const batchSelectionMode = ref(false)
 const showStartDialog = ref(false)
 const showBillDialog = ref(false)
 const showExtendDialog = ref(false)
+const showReservationDialog = ref(false)
 const showConfigDialog = ref(false)
 const showEditDialog = ref(false)
 const showCategoryDialog = ref(false)
+const searchKeyword = ref('')
 
 let refreshTimer: number | null = null
 
@@ -172,13 +195,18 @@ const loadCategories = async () => {
 const loadTables = async () => {
   try {
     loading.value = true
-    const data = await getTableList('', currentCategory.value)
+    const data = await getTableList('', currentCategory.value, searchKeyword.value)
     tables.value = data
   } catch (error) {
     console.error('加载桌台失败', error)
   } finally {
     loading.value = false
   }
+}
+
+// 搜索处理
+const handleSearch = () => {
+  loadTables()
 }
 
 // 切换分类
@@ -224,6 +252,35 @@ const handleExtend = (table: TableInfo) => {
 // 忽略提醒
 const handleIgnoreRemind = async (table: TableInfo) => {
   refreshTables()
+}
+
+// 预定桌台
+const handleReserve = (table: TableInfo) => {
+  selectedTable.value = table
+  showReservationDialog.value = true
+}
+
+// 取消预定
+const handleCancelReservation = async (table: TableInfo) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认要取消桌台「${table.name}」的预定吗？`,
+      '取消预定',
+      {
+        type: 'warning',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消'
+      }
+    )
+
+    await cancelReservation(table.id)
+    ElMessage.success('取消预定成功')
+    refreshTables()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '取消预定失败')
+    }
+  }
 }
 
 // 编辑桌台

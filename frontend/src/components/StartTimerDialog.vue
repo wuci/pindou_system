@@ -29,27 +29,32 @@
         >
           {{ selectedMember ? selectedMember.name : '选择会员' }}
         </el-button>
-        <div v-if="selectedMember" style="margin-top: 8px; color: #67c23a;">
-          <el-tag type="success" size="small">{{ selectedMember.levelName }}</el-tag>
-          <span style="margin-left: 8px;">{{ (selectedMember.discountRate * 10).toFixed(1) }}折</span>
+        <div v-if="selectedMember" class="member-info-detail">
+          <div class="member-info-row">
+            <el-tag type="success" size="small">{{ selectedMember.levelName }}</el-tag>
+            <span style="margin-left: 8px;">{{ (selectedMember.discountRate * 10).toFixed(1) }}折</span>
+          </div>
+          <div class="member-info-row">
+            <span class="member-balance-label">会员余额：</span>
+            <span class="member-balance-value">¥{{ selectedMember.balance.toFixed(2) }}</span>
+          </div>
         </div>
       </el-form-item>
 
       <!-- 渠道选择 -->
-      <el-form-item label="订餐渠道">
-        <el-radio-group v-model="selectedChannel" @change="handleChannelChange">
-          <el-radio
+      <el-form-item label="套餐类型">
+        <el-select v-model="selectedChannel" placeholder="请选择套餐类型" @change="handleChannelChange" style="width: 100%">
+          <el-option
             v-for="channel in billingRules?.channels || []"
             :key="channel.channel"
+            :label="channel.channelName"
             :value="channel.channel"
-          >
-            {{ channel.channelName }}
-          </el-radio>
-        </el-radio-group>
+          />
+        </el-select>
       </el-form-item>
 
       <!-- 时长设置 -->
-      <el-form-item label="预设时长" required>
+      <el-form-item label="套餐时长" required>
         <el-radio-group v-model="selectedRuleIndex" @change="handleRuleChange" class="rules-radio-group">
           <el-radio
             v-for="(rule, index) in currentRules"
@@ -88,8 +93,64 @@
       </el-form-item>
 
       <!-- 当前选择的时长预览 -->
-      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="时长预览">
+      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="套餐时长">
         <span class="duration-preview">{{ durationPreview }}</span>
+      </el-form-item>
+
+      <!-- 延长时间（仅非不限时时显示） -->
+      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="延长时间">
+        <span class="extend-time-display">{{ formatExtendTime }}</span>
+      </el-form-item>
+
+      <!-- 总时长预览（仅非不限时时显示） -->
+      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="总时长">
+        <span class="duration-preview total-preview">{{ totalDurationPreview }}</span>
+      </el-form-item>
+
+      <!-- 费用信息（仅非不限时时显示） -->
+      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="费用">
+        <!-- 选择会员时：显示原价和折扣价 -->
+        <div v-if="selectedMember" class="price-display-row">
+          <div class="price-item-inline">
+            <span class="price-label">原价：</span>
+            <span class="price-original">¥{{ originalPrice.toFixed(2) }}</span>
+          </div>
+          <div class="price-item-inline">
+            <span class="price-label">折扣价：</span>
+            <span class="price-discount">¥{{ discountedPrice.toFixed(2) }}</span>
+            <span v-if="memberDiscount > 0" class="discount-tag">
+              ({{ (memberDiscount * 10).toFixed(1) }}折)
+            </span>
+          </div>
+        </div>
+        <!-- 未选择会员时：只显示价格 -->
+        <span v-else class="price-normal">¥{{ originalPrice.toFixed(2) }}</span>
+      </el-form-item>
+
+      <!-- 支付方式选择 -->
+      <el-form-item label="支付方式">
+        <el-select
+          v-model="selectedPaymentMethod"
+          placeholder="请选择支付方式"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="method in availablePaymentMethods"
+            :key="method.value"
+            :label="method.label"
+            :value="method.value"
+          >
+            <div class="payment-option-content">
+              <span class="payment-option-label">{{ method.label }}</span>
+              <span v-if="method.description" class="payment-option-description">{{ method.description }}</span>
+            </div>
+          </el-option>
+        </el-select>
+        <!-- 组合支付信息提示 -->
+        <div v-if="selectedPaymentMethod === 'combined' && combinedPaymentInfo" class="combined-payment-info">
+          <el-icon><InfoFilled /></el-icon>
+          <span>{{ combinedPaymentInfo.description }}</span>
+        </div>
       </el-form-item>
 
       <!-- 备注 -->
@@ -125,10 +186,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import type { TableInfo } from '@/api/table'
 import { startTable } from '@/api/table'
-import { getBillingRuleConfig, type BillingRule, type BillingRuleItem } from '@/api/config'
+import { NON_MEMBER_PAYMENT_METHODS, MEMBER_PAYMENT_METHODS, type PaymentMethod } from '@/api/table'
+import { getBillingRuleConfig, getSystemConfig, type BillingRule, type BillingRuleItem, type SystemConfig } from '@/api/config'
 import type { MemberInfo } from '@/api/member'
 import MemberSelectDialog from './MemberSelectDialog.vue'
 
@@ -154,6 +217,36 @@ const isMember = ref(false)
 const selectedMember = ref<MemberInfo | null>(null)
 const memberDialogVisible = ref(false)
 
+// 支付方式
+const selectedPaymentMethod = ref<PaymentMethod>('offline')
+
+// 可用的支付方式列表
+const availablePaymentMethods = computed(() => {
+  return isMember.value ? MEMBER_PAYMENT_METHODS : NON_MEMBER_PAYMENT_METHODS
+})
+
+// 组合支付信息计算
+const combinedPaymentInfo = computed(() => {
+  if (selectedPaymentMethod.value !== 'combined' || !selectedMember.value) {
+    return null
+  }
+  const balance = selectedMember.value.balance || 0
+  const totalAmount = discountedPrice.value || originalPrice.value || 0
+  if (balance >= totalAmount) {
+    return {
+      balanceAmount: totalAmount,
+      otherAmount: 0,
+      description: '余额充足，全部使用余额支付'
+    }
+  } else {
+    return {
+      balanceAmount: balance,
+      otherAmount: totalAmount - balance,
+      description: `余额${balance.toFixed(2)}元 + 线下${(totalAmount - balance).toFixed(2)}元`
+    }
+  }
+})
+
 // 标志：是否正在初始化（用于避免 handleChannelChange 干扰）
 const isInitializing = ref(false)
 
@@ -165,7 +258,7 @@ const form = ref({
 
 // 计费规则数据
 const billingRules = ref<BillingRule | null>(null)
-const selectedChannel = ref<string>('store')
+const selectedChannel = ref<string>('')
 
 // 选中的规则索引或特殊值
 const selectedRuleIndex = ref<number | 'custom' | 'unlimited'>(0)
@@ -173,6 +266,9 @@ const selectedRuleIndex = ref<number | 'custom' | 'unlimited'>(0)
 // 自定义时长
 const customHours = ref(1)
 const customMinutes = ref(0)
+
+// 延长时间（从系统配置读取，单位：分钟）
+const extendTime = ref(0)
 
 // 对话框显示状态
 const visible = computed({
@@ -235,6 +331,110 @@ const durationPreview = computed(() => {
   }
 })
 
+// 格式化延长时间显示
+const formatExtendTime = computed(() => {
+  const minutes = extendTime.value
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+
+  if (hours > 0 && mins > 0) {
+    return `${hours}小时${mins}分钟`
+  } else if (hours > 0) {
+    return `${hours}小时`
+  } else {
+    return `${mins}分钟`
+  }
+})
+
+// 会员折扣率
+const memberDiscount = computed(() => {
+  return selectedMember.value?.discountRate || 0
+})
+
+// 当前选择的价格
+const currentRulePrice = computed(() => {
+  if (typeof selectedRuleIndex.value === 'number') {
+    const rule = currentRules.value[selectedRuleIndex.value]
+    return rule?.price || 0
+  }
+  return 0
+})
+
+// 原价
+const originalPrice = computed(() => {
+  return currentRulePrice.value
+})
+
+// 折扣价
+const discountedPrice = computed(() => {
+  // 有会员折扣时，原价 * 折扣率；无会员时，折扣价 = 原价
+  if (selectedMember.value && memberDiscount.value > 0) {
+    return originalPrice.value * memberDiscount.value
+  }
+  return originalPrice.value
+})
+
+// 总时长预览（套餐时长 + 延时时长）
+const totalDurationPreview = computed(() => {
+  let baseSeconds = 0
+  if (selectedRuleIndex.value === 'custom') {
+    baseSeconds = customHours.value * 3600 + customMinutes.value * 60
+  } else if (typeof selectedRuleIndex.value === 'number') {
+    const rule = currentRules.value[selectedRuleIndex.value]
+    if (rule && !rule.unlimited && rule.minutes) {
+      baseSeconds = rule.minutes * 60
+    } else {
+      return '不限时'
+    }
+  }
+
+  // 始终加上延长时间
+  const extendSeconds = extendTime.value * 60
+  const totalSeconds = baseSeconds + extendSeconds
+
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}小时${minutes}分钟`
+  } else if (hours > 0) {
+    return `${hours}小时`
+  } else {
+    return `${minutes}分钟`
+  }
+})
+
+// 加载系统配置（获取延长时间）
+const loadSystemConfig = async () => {
+  try {
+    const configStr = await getSystemConfig()
+    console.log('系统配置字符串:', configStr)
+
+    if (!configStr) {
+      console.warn('系统配置为空，使用默认延长时间 30 分钟')
+      extendTime.value = 30
+      return
+    }
+
+    // 解析 JSON
+    const config = JSON.parse(configStr) as SystemConfig
+    console.log('解析后的系统配置:', config)
+
+    if (config && config.extendTime !== undefined && config.extendTime !== null) {
+      extendTime.value = config.extendTime
+      console.log('✅ 从系统配置读取延长时间:', config.extendTime, '分钟')
+    } else {
+      console.warn('系统配置中未设置延长时间，使用默认值 30 分钟')
+      extendTime.value = 30
+    }
+  } catch (error) {
+    console.error('加载系统配置失败:', error)
+    ElMessage.warning('无法获取延长时间配置，使用默认值 30 分钟')
+    // 设置默认延长时间为 30 分钟
+    extendTime.value = 30
+  }
+}
+
 // 加载计费规则
 const loadBillingRules = async () => {
   try {
@@ -282,10 +482,10 @@ const loadBillingRules = async () => {
 
     billingRules.value = parsed
 
-    // 设置当前选中的渠道（如果当前渠道不存在，则选择第一个渠道）
-    const currentChannelExists = parsed.channels.some((c: any) => c.channel === selectedChannel.value)
-    if (!currentChannelExists && parsed.channels.length > 0) {
+    // 默认选中第一条渠道数据
+    if (parsed.channels && parsed.channels.length > 0) {
       selectedChannel.value = parsed.channels[0].channel
+      console.log('默认选中第一条渠道:', parsed.channels[0].channelName)
     }
 
     // 使用 nextTick 确保响应式更新后再访问 currentRules
@@ -356,13 +556,11 @@ const handleRuleChange = () => {
 watch(() => props.modelValue, async (newVal) => {
   console.log('=== Dialog modelValue changed:', newVal)
   if (newVal) {
-    // 对话框打开时，加载计费规则
-    if (!billingRules.value) {
-      console.log('Billing rules not loaded, loading...')
-      await loadBillingRules()
-    } else {
-      console.log('Billing rules already loaded')
-    }
+    // 对话框打开时，同时加载计费规则和系统配置
+    await Promise.all([
+      billingRules.value ? Promise.resolve() : loadBillingRules(),
+      loadSystemConfig()
+    ])
     // 重置到默认选择
     initializeForm()
   }
@@ -385,8 +583,32 @@ const initializeForm = () => {
   isMember.value = false
   selectedMember.value = null
 
-  // 重置为默认渠道
-  selectedChannel.value = 'store'
+  // 重置支付方式为默认值
+  selectedPaymentMethod.value = 'offline'
+
+  // 如果桌台已有会员信息，自动设置会员
+  if (props.table?.memberId && props.table?.memberName) {
+    isMember.value = true
+    selectedMember.value = {
+      id: props.table.memberId,
+      name: props.table.memberName,
+      phone: '',
+      address: '',
+      totalAmount: 0,
+      balance: props.table.memberBalance || 0,
+      levelId: 0,
+      levelName: '',
+      discountRate: props.table.memberDiscountRate || 1,
+      createdAt: 0,
+      updatedAt: 0
+    }
+    console.log('自动设置会员:', selectedMember.value)
+  }
+
+  // 重置为第一条渠道数据
+  if (billingRules.value && billingRules.value.channels && billingRules.value.channels.length > 0) {
+    selectedChannel.value = billingRules.value.channels[0].channel
+  }
 
   // 使用 nextTick 确保 billingRules 已更新
   nextTick(() => {
@@ -469,7 +691,10 @@ const resetForm = () => {
     presetDuration: 0,
     remark: ''
   }
-  selectedChannel.value = 'store'
+  // 重置为第一条渠道数据
+  if (billingRules.value && billingRules.value.channels && billingRules.value.channels.length > 0) {
+    selectedChannel.value = billingRules.value.channels[0].channel
+  }
   // 使用 nextTick 确保响应式更新
   nextTick(() => {
     if (currentRules.value.length > 0) {
@@ -501,37 +726,44 @@ const handleConfirm = async () => {
   }
   console.log('====================')
 
-  // 直接根据选择的规则计算时长，避免依赖 form.presetDuration 可能的时序问题
-  let actualDuration = 0
+  // 直接根据选择的规则计算套餐时长（不包含延长时间）
+  let packageDuration = 0
 
   if (selectedRuleIndex.value === 'unlimited') {
-    actualDuration = 0
+    packageDuration = 0
   } else if (selectedRuleIndex.value === 'custom') {
-    actualDuration = customHours.value * 3600 + customMinutes.value * 60
+    packageDuration = customHours.value * 3600 + customMinutes.value * 60
     // 验证自定义时长
-    if (actualDuration <= 0) {
+    if (packageDuration <= 0) {
       ElMessage.error('请设置有效的时长')
       return
     }
   } else if (typeof selectedRuleIndex.value === 'number') {
     const rule = currentRules.value[selectedRuleIndex.value]
     if (rule && !rule.unlimited && rule.minutes) {
-      actualDuration = rule.minutes * 60
+      packageDuration = rule.minutes * 60
     } else {
-      actualDuration = 0
+      packageDuration = 0
     }
   }
 
-  console.log('Actual duration to submit:', actualDuration, 'seconds')
+  // 延长时间仅用于前端展示，不传给后端
+  const extendDuration = extendTime.value * 60
+  const totalDisplayDuration = packageDuration + extendDuration
+
+  console.log('套餐时长:', packageDuration, '秒')
+  console.log('延长时间:', extendDuration, '秒 (', extendTime.value, '分钟)')
+  console.log('总时长（仅展示）:', totalDisplayDuration, '秒')
 
   loading.value = true
 
   try {
     await startTable(props.table.id, {
-      presetDuration: actualDuration,
+      presetDuration: packageDuration,  // 只传套餐时长，不包含延长时间
       channel: selectedChannel.value,
       memberId: selectedMember.value?.id,
-      remark: form.value.remark
+      remark: form.value.remark,
+      paymentMethod: selectedPaymentMethod.value
     })
 
     ElMessage.success('开始计时成功')
@@ -548,7 +780,12 @@ const handleConfirm = async () => {
 const handleMemberToggle = (value: boolean) => {
   if (!value) {
     selectedMember.value = null
+  } else {
+    // 切换到会员时，自动弹出会员选择对话框
+    showMemberDialog()
   }
+  // 切换会员状态时，重置支付方式为默认值
+  selectedPaymentMethod.value = 'offline'
 }
 
 // 显示会员选择对话框
@@ -589,6 +826,77 @@ defineExpose({
   padding: 8px 16px;
   background: #ecf5ff;
   border-radius: 4px;
+}
+
+.extend-time-display {
+  font-size: 15px;
+  font-weight: 500;
+  color: #E6A23C;
+  padding: 8px 16px;
+  background: #fdf6ec;
+  border-radius: 4px;
+  border: 1px dashed #E6A23C;
+}
+
+.total-preview {
+  font-size: 18px;
+  font-weight: 600;
+  color: #67C23A;
+  background: #f0f9ff;
+  border: 2px solid #67C23A;
+}
+
+.price-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.price-display-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.price-item-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.price-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.price-normal {
+  font-size: 18px;
+  font-weight: 600;
+  color: #409EFF;
+}
+
+.price-original {
+  font-size: 16px;
+  font-weight: 500;
+  color: #909399;
+  text-decoration: line-through;
+}
+
+.price-discount {
+  font-size: 18px;
+  font-weight: 600;
+  color: #67C23A;
+}
+
+.discount-tag {
+  font-size: 12px;
+  color: #67C23A;
+  background: #f0f9ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 4px;
 }
 
 .rules-radio-group {
@@ -645,5 +953,64 @@ defineExpose({
 
 :deep(.el-input-number) {
   width: 100%;
+}
+
+.payment-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.payment-option-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.payment-option-description {
+  font-size: 12px;
+  color: #909399;
+}
+
+.combined-payment-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #f0f9ff;
+  border: 1px solid #67c23a;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #67c23a;
+}
+
+.combined-payment-info .el-icon {
+  font-size: 16px;
+}
+
+.member-info-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.member-info-row {
+  display: flex;
+  align-items: center;
+  color: #67c23a;
+}
+
+.member-balance-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.member-balance-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #409eff;
+  margin-left: 4px;
 }
 </style>

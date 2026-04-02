@@ -63,6 +63,7 @@ export interface OrderDetail {
   pauseDuration: number
   actualDuration: number
   presetDuration: number | null
+  channel?: string  // 订单渠道
   status: 'active' | 'completed'
   amount: number
   originalAmount?: number  // 原价（折扣前）

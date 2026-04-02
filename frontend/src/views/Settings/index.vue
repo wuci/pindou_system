@@ -204,7 +204,7 @@
                 >
                   <template #default>
                     <div>• 即将到期：剩余时间达到阈值时提醒</div>
-                    <div>• 已超时：使用时间超过预设时长时提醒</div>
+                    <div>• 已超时：使用时间超过套餐时长时提醒</div>
                     <div>• 超时后会按重复间隔持续提醒</div>
                   </template>
                 </el-alert>

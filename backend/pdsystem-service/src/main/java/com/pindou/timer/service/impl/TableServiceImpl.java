@@ -464,6 +464,12 @@ public class TableServiceImpl implements TableService {
             log.info("更新订单会员信息: orderId={}, memberId={}", order.getId(), request.getMemberId());
         }
 
+        // 更新订单的支付方式
+        if (request.getPaymentMethod() != null) {
+            order.setPaymentMethod(request.getPaymentMethod());
+            log.info("更新订单支付方式: orderId={}, paymentMethod={}", order.getId(), request.getPaymentMethod());
+        }
+
         // 更新订单的预设时长和费用
         Integer currentPresetDuration = order.getPresetDuration();
         Integer newPresetDuration;
@@ -652,6 +658,12 @@ public class TableServiceImpl implements TableService {
                 order.setPaidAt("completed".equals(orderStatus) ? now : null); // 作废订单不记录支付时间
                 order.setUpdatedAt(now);
 
+                // 更新支付方式（从请求中获取，如果有的话）
+                if (request != null && request.getPaymentMethod() != null) {
+                    order.setPaymentMethod(request.getPaymentMethod());
+                    log.info("更新订单支付方式: orderId={}, paymentMethod={}", order.getId(), request.getPaymentMethod());
+                }
+
                 // 处理余额扣除
                 if (order.getMemberId() != null && order.getPaymentMethod() != null && "completed".equals(orderStatus)) {
                     String paymentMethod = order.getPaymentMethod();
@@ -838,6 +850,7 @@ public class TableServiceImpl implements TableService {
 
                     memberInfo.setDiscountAmount(java.math.BigDecimal.valueOf(discountAmount));
                     memberInfo.setFinalAmount(java.math.BigDecimal.valueOf(finalAmount));
+                    memberInfo.setBalance(member.getBalance());
 
                     response.setMember(memberInfo);
                     log.info("会员信息: memberId={}, levelName={}, discountRate={}, originalAmount={}, discountAmount={}, finalAmount={}",
@@ -1045,6 +1058,11 @@ public class TableServiceImpl implements TableService {
                                     if (memberLevel != null && memberLevel.getDiscountRate() != null) {
                                         response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
                                     }
+                                }
+
+                                // 设置会员余额
+                                if (member.getBalance() != null) {
+                                    response.setMemberBalance(member.getBalance().doubleValue());
                                 }
                             }
                         } catch (Exception e) {

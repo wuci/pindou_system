@@ -84,6 +84,9 @@ public class OrderDetailResponse implements Serializable {
     @Schema(description = "会员信息")
     private MemberInfo memberInfo;
 
+    @Schema(description = "订单渠道")
+    private String channel;
+
     @Schema(description = "创建时间（毫秒时间戳）")
     private Long createdAt;
 
