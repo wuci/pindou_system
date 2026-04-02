@@ -11,6 +11,7 @@ import com.pindou.timer.entity.Table;
 import com.pindou.timer.entity.Member;
 import com.pindou.timer.entity.MemberLevel;
 import com.pindou.timer.event.TableStatusChangeEvent;
+import com.pindou.timer.mapper.MemberMapper;
 import com.pindou.timer.mapper.OrderMapper;
 import com.pindou.timer.mapper.TableMapper;
 import com.pindou.timer.service.BillingService;
@@ -42,6 +43,7 @@ public class TableServiceImpl implements TableService {
 
     private final TableMapper tableMapper;
     private final OrderMapper orderMapper;
+    private final MemberMapper memberMapper;
     private final BillingService billingService;
     private final ConfigService configService;
     private final MemberService memberService;
@@ -53,9 +55,10 @@ public class TableServiceImpl implements TableService {
     private static final int MIN_TABLE_COUNT = 1;
     private static final int MAX_TABLE_COUNT = 50;
 
-    public TableServiceImpl(TableMapper tableMapper, OrderMapper orderMapper, BillingService billingService, ConfigService configService, MemberService memberService, MemberLevelService memberLevelService, ApplicationEventPublisher eventPublisher) {
+    public TableServiceImpl(TableMapper tableMapper, OrderMapper orderMapper, MemberMapper memberMapper, BillingService billingService, ConfigService configService, MemberService memberService, MemberLevelService memberLevelService, ApplicationEventPublisher eventPublisher) {
         this.tableMapper = tableMapper;
         this.orderMapper = orderMapper;
+        this.memberMapper = memberMapper;
         this.billingService = billingService;
         this.configService = configService;
         this.memberService = memberService;
@@ -648,6 +651,56 @@ public class TableServiceImpl implements TableService {
                 order.setStatus(orderStatus);
                 order.setPaidAt("completed".equals(orderStatus) ? now : null); // 作废订单不记录支付时间
                 order.setUpdatedAt(now);
+
+                // 处理余额扣除
+                if (order.getMemberId() != null && order.getPaymentMethod() != null && "completed".equals(orderStatus)) {
+                    String paymentMethod = order.getPaymentMethod();
+                    java.math.BigDecimal finalAmountBigDecimal = java.math.BigDecimal.valueOf(finalAmount);
+
+                    if ("balance".equals(paymentMethod) || "combined".equals(paymentMethod)) {
+                        // 查询会员信息
+                        Member member = memberMapper.selectById(order.getMemberId());
+                        if (member == null) {
+                            throw new BusinessException(com.pindou.timer.common.result.ErrorCode.NOT_FOUND, "会员信息不存在");
+                        }
+
+                        java.math.BigDecimal balance = member.getBalance();
+                        java.math.BigDecimal balanceAmount = java.math.BigDecimal.ZERO;
+                        java.math.BigDecimal otherAmount = java.math.BigDecimal.ZERO;
+
+                        if ("balance".equals(paymentMethod)) {
+                            // 纯余额支付
+                            if (balance.compareTo(finalAmountBigDecimal) < 0) {
+                                throw new BusinessException(com.pindou.timer.common.result.ErrorCode.INVALID_PARAM,
+                                    "余额不足，当前余额：" + balance + "元，需支付：" + finalAmountBigDecimal + "元");
+                            }
+                            balanceAmount = finalAmountBigDecimal;
+                        } else {
+                            // 组合支付：优先使用余额
+                            if (balance.compareTo(finalAmountBigDecimal) >= 0) {
+                                // 余额充足，全部用余额
+                                balanceAmount = finalAmountBigDecimal;
+                            } else {
+                                // 余额不足，用完余额，剩余线下支付
+                                balanceAmount = balance;
+                                otherAmount = finalAmountBigDecimal.subtract(balance);
+                            }
+                        }
+
+                        // 扣除余额
+                        member.setBalance(member.getBalance().subtract(balanceAmount));
+                        member.setTotalAmount(member.getTotalAmount().add(finalAmountBigDecimal));
+                        memberMapper.updateById(member);
+
+                        // 更新订单支付信息
+                        order.setBalanceAmount(balanceAmount);
+                        order.setOtherPaymentAmount(otherAmount);
+
+                        log.info("余额扣除成功 - 会员ID:{}, 支付方式:{}, 扣除金额:{}, 余额剩余:{}",
+                                member.getId(), paymentMethod, balanceAmount, member.getBalance());
+                    }
+                }
+
                 orderMapper.updateById(order);
 
                 // 更新会员累计消费（仅已完成的订单）
