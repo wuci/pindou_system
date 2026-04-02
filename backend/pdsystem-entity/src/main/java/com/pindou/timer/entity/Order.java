@@ -89,6 +89,18 @@ public class Order implements Serializable {
     @TableField("paid_at")
     private Long paidAt;
 
+    @Schema(description = "支付方式：offline-线下, online-线上, balance-余额, combined-组合")
+    @TableField("payment_method")
+    private String paymentMethod;
+
+    @Schema(description = "余额支付金额")
+    @TableField("balance_amount")
+    private BigDecimal balanceAmount;
+
+    @Schema(description = "其他方式支付金额")
+    @TableField("other_payment_amount")
+    private BigDecimal otherPaymentAmount;
+
     @Schema(description = "创建时间（毫秒时间戳）")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Long createdAt;
