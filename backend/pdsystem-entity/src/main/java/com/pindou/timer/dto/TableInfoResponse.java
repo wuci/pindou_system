@@ -29,6 +29,9 @@ public class TableInfoResponse implements Serializable {
     @Schema(description = "当前订单ID")
     private String currentOrderId;
 
+    @Schema(description = "订单渠道")
+    private String channel;
+
     @Schema(description = "开始时间（毫秒时间戳）")
     private Long startTime;
 
@@ -47,6 +50,9 @@ public class TableInfoResponse implements Serializable {
     @Schema(description = "原价（折扣前，元）")
     private Double originalAmount;
 
+    @Schema(description = "会员ID")
+    private Long memberId;
+
     @Schema(description = "会员姓名")
     private String memberName;
 
@@ -59,6 +65,18 @@ public class TableInfoResponse implements Serializable {
     @Schema(description = "提醒是否被忽略：1-是 0-否")
     private Integer remindIgnored;
 
+    @Schema(description = "预定状态：none-未预定，reserved-已预定")
+    private String reservationStatus;
+
+    @Schema(description = "预定截止时间（毫秒时间戳）")
+    private Long reservationEndTime;
+
+    @Schema(description = "预订人姓名")
+    private String reservationName;
+
+    @Schema(description = "预订人手机号")
+    private String reservationPhone;
+
     @Schema(description = "分类ID")
     private Long categoryId;
 
@@ -67,4 +85,13 @@ public class TableInfoResponse implements Serializable {
 
     @Schema(description = "到点时间（毫秒时间戳）")
     private Long endTime;
+
+    @Schema(description = "支付方式")
+    private String paymentMethod;
+
+    @Schema(description = "余额支付金额")
+    private Double balanceAmount;
+
+    @Schema(description = "其他方式支付金额")
+    private Double otherPaymentAmount;
 }
