@@ -56,6 +56,15 @@ public class BillResponse implements Serializable {
     @Schema(description = "会员信息")
     private MemberInfo member;
 
+    @Schema(description = "支付方式")
+    private String paymentMethod;
+
+    @Schema(description = "余额支付金额")
+    private Double balanceAmount;
+
+    @Schema(description = "其他方式支付金额")
+    private Double otherPaymentAmount;
+
     @Schema(description = "状态：active-进行中 completed-已完成")
     private String status;
 }
