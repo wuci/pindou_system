@@ -849,6 +849,15 @@ public class TableServiceImpl implements TableService {
             }
         }
 
+        // 设置支付方式信息
+        if (order.getPaymentMethod() != null) {
+            response.setPaymentMethod(order.getPaymentMethod());
+            response.setBalanceAmount(order.getBalanceAmount() != null ?
+                order.getBalanceAmount().doubleValue() : null);
+            response.setOtherPaymentAmount(order.getOtherPaymentAmount() != null ?
+                order.getOtherPaymentAmount().doubleValue() : null);
+        }
+
         log.info("获取桌台账单成功: tableId={}, amount={}", tableId, amountDetail.getTotalAmount());
         return response;
     }
