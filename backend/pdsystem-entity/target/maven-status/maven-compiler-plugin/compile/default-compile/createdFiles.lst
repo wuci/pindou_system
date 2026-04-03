@@ -13,6 +13,7 @@ com\pindou\timer\common\result\Result.class
 com\pindou\timer\dto\UpdateMemberRequest.class
 com\pindou\timer\dto\CreateUserRequest.class
 com\pindou\timer\entity\Table.class
+com\pindou\timer\common\exception\PDException.class
 com\pindou\timer\dto\MemberResponse.class
 com\pindou\timer\dto\UserResponse.class
 com\pindou\timer\dto\RoleQueryRequest.class
@@ -36,6 +37,7 @@ com\pindou\timer\dto\RemindConfigRequest.class
 com\pindou\timer\dto\CreateRoleRequest.class
 com\pindou\timer\dto\ExtendTableRequest.class
 com\pindou\timer\entity\Role.class
+com\pindou\timer\dto\PermissionResponse.class
 com\pindou\timer\dto\UpdateMemberLevelRequest.class
 com\pindou\timer\dto\UserInfo.class
 com\pindou\timer\entity\ConsumptionRecord.class
@@ -61,4 +63,5 @@ com\pindou\timer\entity\OperationLog.class
 com\pindou\timer\entity\User.class
 com\pindou\timer\dto\TimeLineItem.class
 com\pindou\timer\dto\OrderQueryRequest.class
+com\pindou\timer\entity\Permission.class
 com\pindou\timer\dto\AmountDetail.class

@@ -26,6 +26,9 @@ export interface OrderInfo {
   memberName?: string  // 会员姓名（用于显示）
   memberLevelName?: string  // 会员等级名称
   memberDiscountRate?: number  // 会员折扣率
+  paymentMethod?: string  // 支付方式
+  balanceAmount?: number  // 余额支付金额
+  otherPaymentAmount?: number  // 其他方式支付金额
 }
 
 /**
@@ -78,6 +81,9 @@ export interface OrderDetail {
   memberName?: string  // 会员姓名
   memberLevelName?: string  // 会员等级名称
   memberDiscountRate?: number  // 会员折扣率
+  paymentMethod?: string  // 支付方式
+  balanceAmount?: number  // 余额支付金额
+  otherPaymentAmount?: number  // 其他方式支付金额
   timeLine: TimeLineItem[]
 }
 

@@ -1,5 +1,9 @@
 import { http } from '@/utils/request'
 import type { PageResult, PageParams } from '@/types'
+import type { PermissionResponse } from './permission'
+
+// 重新导出权限类型，方便使用
+export type { PermissionResponse }
 
 /**
  * 角色信息
@@ -97,14 +101,4 @@ export const deleteRole = (id: string) => {
  */
 export const getRolePermissions = (id: string) => {
   return http.get<string[]>(`/roles/${id}/permissions`)
-}
-
-/**
- * 权限树节点
- */
-export interface PermissionTreeNode {
-  id: string
-  label: string
-  key?: string
-  children?: PermissionTreeNode[]
 }

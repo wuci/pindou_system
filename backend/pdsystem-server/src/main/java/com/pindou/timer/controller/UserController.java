@@ -134,11 +134,11 @@ public class UserController {
     @PutMapping("/{id}/reset-password")
     public Result<Void> resetPassword(
             @Parameter(description = "用户ID") @PathVariable("id") String userId,
-            @RequestParam(defaultValue = "123456") String newPassword) {
+            @Validated @RequestBody ResetPasswordRequest request) {
 
         log.info("重置用户密码请求: userId={}", userId);
 
-        userService.resetPassword(userId, newPassword);
+        userService.resetPassword(userId, request.getPassword());
 
         return Result.success();
     }

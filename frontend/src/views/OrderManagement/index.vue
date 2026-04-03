@@ -5,6 +5,7 @@
         <div class="card-header">
           <span class="card-title">订单管理</span>
           <el-button
+            v-if="permissions.canExport"
             type="primary"
             size="default"
             @click="handleExport"
@@ -97,6 +98,24 @@
                 <span v-else class="non-member">非会员</span>
               </template>
             </el-table-column>
+            <el-table-column label="支付方式" width="160" align="center">
+              <template #default="{ row }">
+                <div v-if="row.paymentMethod" class="payment-method-cell">
+                  <el-tag :type="getPaymentMethodTagType(row.paymentMethod)" size="small" effect="plain">
+                    {{ getPaymentMethodLabel(row.paymentMethod) }}
+                  </el-tag>
+                  <div v-if="row.paymentMethod === 'combined' || row.paymentMethod === 'balance'" class="payment-breakdown">
+                    <div v-if="row.balanceAmount > 0" class="payment-item balance">
+                      余额 ¥{{ formatMoney(row.balanceAmount) }}
+                    </div>
+                    <div v-if="row.otherPaymentAmount > 0" class="payment-item offline">
+                      线下 ¥{{ formatMoney(row.otherPaymentAmount) }}
+                    </div>
+                  </div>
+                </div>
+                <span v-else class="non-member">-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag v-if="row.status === 'active'" type="success" size="large" effect="plain">进行中</el-tag>
@@ -106,6 +125,7 @@
             <el-table-column label="操作" width="100" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button
+                  v-if="permissions.canViewDetail"
                   type="primary"
                   size="default"
                   link
@@ -283,6 +303,27 @@
                 <span v-else class="non-member">非会员</span>
               </template>
             </el-table-column>
+            <el-table-column label="支付方式" width="160" align="center">
+              <template #default="{ row }">
+                <div v-if="row.paymentMethod" class="payment-method-cell">
+                  <el-tag :type="getPaymentMethodTagType(row.paymentMethod)" size="small" effect="plain">
+                    {{ getPaymentMethodLabel(row.paymentMethod) }}
+                  </el-tag>
+                  <div v-if="row.paymentMethod === 'combined' || row.paymentMethod === 'balance'" class="payment-breakdown">
+                    <div v-if="row.balanceAmount > 0" class="payment-item balance">
+                      余额 ¥{{ formatMoney(row.balanceAmount) }}
+                    </div>
+                    <div v-if="row.otherPaymentAmount > 0" class="payment-item offline">
+                      线下 ¥{{ formatMoney(row.otherPaymentAmount) }}
+                    </div>
+                  </div>
+                  <div v-if="row.paidAt" class="payment-time">
+                    {{ formatDateTime(row.paidAt) }}
+                  </div>
+                </div>
+                <span v-else class="non-member">-</span>
+              </template>
+            </el-table-column>
             <el-table-column label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag v-if="row.status === 'active'" type="success" size="large" effect="plain">进行中</el-tag>
@@ -295,6 +336,7 @@
             <el-table-column label="操作" width="100" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button
+                  v-if="permissions.canViewDetail"
                   type="primary"
                   size="default"
                   link
@@ -331,13 +373,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { getActiveOrders, getHistoryOrders, exportOrders } from '@/api/order'
 import type { OrderInfo } from '@/api/order'
 import { ElMessage } from 'element-plus'
 import { Download, Search, RefreshLeft } from '@element-plus/icons-vue'
 import OrderDetailDrawer from '@/components/OrderDetailDrawer.vue'
 import { useChannelTranslation } from '@/composables/useChannelTranslation'
+import { useUserStore } from '@/stores/user'
+
+// 用户状态和权限
+const userStore = useUserStore()
+
+const permissions = computed(() => ({
+  canViewDetail: userStore.hasPermission('order:detail'),
+  canExport: userStore.hasPermission('order:export')
+}))
 
 // 渠道翻译
 const { loadBillingRules, getChannels, getChannelName } = useChannelTranslation()
@@ -541,6 +592,32 @@ const formatDuration = (seconds: number) => {
 
 const formatMoney = (amount: number) => {
   return amount.toFixed(2)
+}
+
+/**
+ * 获取支付方式标签
+ */
+const getPaymentMethodLabel = (method: string) => {
+  const labels: Record<string, string> = {
+    offline: '线下支付',
+    online: '线上支付',
+    balance: '会员余额',
+    combined: '组合支付'
+  }
+  return labels[method] || method
+}
+
+/**
+ * 获取支付方式标签类型
+ */
+const getPaymentMethodTagType = (method: string) => {
+  const types: Record<string, string> = {
+    offline: '',
+    online: 'primary',
+    balance: 'success',
+    combined: 'warning'
+  }
+  return types[method] || ''
 }
 
 /**
@@ -824,6 +901,44 @@ const getChannelTagType = (channel: string): 'success' | 'warning' | 'danger' | 
 .non-member {
   font-size: 13px;
   color: #c0c4cc;
+}
+
+/* 支付方式样式 */
+.payment-method-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.payment-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.payment-item {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.payment-item.balance {
+  color: #67c23a;
+  background-color: #e7f7e9;
+}
+
+.payment-item.offline {
+  color: #f56c6c;
+  background-color: #fef0f0;
+}
+
+.payment-time {
+  font-size: 11px;
+  color: #909399;
+  margin-top: 2px;
 }
 
 /* 标签样式优化 */

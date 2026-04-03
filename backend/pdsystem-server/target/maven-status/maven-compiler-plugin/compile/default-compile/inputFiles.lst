@@ -25,6 +25,7 @@ D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer
 D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\filter\JwtAuthenticationFilter.java
 D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\MemberController.java
 D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\StatisticsController.java
+D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\PermissionController.java
 D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\RoleController.java
 D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\OrderController.java
 D:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\TableLayoutConfigController.java

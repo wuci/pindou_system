@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>用户管理</span>
-          <el-button type="primary" :icon="Plus" @click="handleAdd">
+          <el-button v-if="permissions.canCreate" type="primary" :icon="Plus" @click="handleAdd">
             新增用户
           </el-button>
         </div>
@@ -81,15 +81,18 @@
             {{ formatDateTime(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" link @click="handleEdit(row)">
+            <el-button v-if="permissions.canUpdate" type="primary" size="small" link @click="handleEdit(row)">
               编辑
             </el-button>
-            <el-button type="warning" size="small" link @click="handleResetPassword(row)">
+            <el-button v-if="permissions.canResetPassword" type="warning" size="small" link @click="handleChangePassword(row)">
+              修改密码
+            </el-button>
+            <el-button v-if="permissions.canResetPassword" type="info" size="small" link @click="handleResetPassword(row)">
               重置密码
             </el-button>
-            <el-button type="danger" size="small" link @click="handleDelete(row)">
+            <el-button v-if="permissions.canDelete" type="danger" size="small" link @click="handleDelete(row)">
               删除
             </el-button>
           </template>
@@ -174,15 +177,77 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 修改密码弹窗 -->
+    <el-dialog
+      v-model="passwordDialogVisible"
+      title="修改密码"
+      width="450px"
+      :close-on-click-modal="false"
+      @close="handlePasswordDialogClose"
+    >
+      <el-form
+        ref="passwordFormRef"
+        :model="passwordFormData"
+        :rules="passwordFormRules"
+        label-width="100px"
+      >
+        <el-form-item label="用户名">
+          <el-input
+            :value="passwordFormData.username"
+            disabled
+          />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="passwordFormData.newPassword"
+            type="password"
+            placeholder="请输入新密码（6-20位字符）"
+            show-password
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="passwordFormData.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+            clearable
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="passwordSubmitting" @click="handleChangePasswordSubmit">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { getUserList, createUser, updateUser, deleteUser, resetPassword, type UserInfo, type CreateUserParams, type UpdateUserParams } from '@/api/user'
-import { getRoleList } from '@/api/role'
+import { useUserStore } from '@/stores/user'
+import { getUserList, createUser, updateUser, deleteUser, resetPassword, changePassword, type UserInfo, type CreateUserParams, type UpdateUserParams } from '@/api/user'
+import { getAllRoles } from '@/api/role'
+
+// 用户状态
+const userStore = useUserStore()
+const router = useRouter()
+
+// 权限检查
+const permissions = computed(() => ({
+  canCreate: userStore.hasPermission('user:create'),
+  canUpdate: userStore.hasPermission('user:update'),
+  canDelete: userStore.hasPermission('user:delete'),
+  canResetPassword: userStore.hasPermission('user:resetPassword')
+}))
 
 interface Role {
   id: string
@@ -211,6 +276,11 @@ const isEdit = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 
+// 修改密码弹窗相关
+const passwordDialogVisible = ref(false)
+const passwordSubmitting = ref(false)
+const passwordFormRef = ref<FormInstance>()
+
 // 表单数据
 const formData = reactive({
   id: '',
@@ -220,6 +290,25 @@ const formData = reactive({
   roleId: '',
   status: 1
 })
+
+// 修改密码表单数据
+const passwordFormData = reactive({
+  userId: '',
+  username: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+// 自定义验证：确认密码必须与新密码一致
+const validateConfirmPassword = (rule: any, value: any, callback: any) => {
+  if (value === '') {
+    callback(new Error('请再次输入密码'))
+  } else if (value !== passwordFormData.newPassword) {
+    callback(new Error('两次输入密码不一致'))
+  } else {
+    callback()
+  }
+}
 
 // 表单验证规则
 const formRules: FormRules = {
@@ -236,6 +325,17 @@ const formRules: FormRules = {
   ],
   roleId: [
     { required: true, message: '请选择角色', trigger: 'change' }
+  ]
+}
+
+// 修改密码表单验证规则
+const passwordFormRules: FormRules = {
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, validator: validateConfirmPassword, trigger: 'blur' }
   ]
 }
 
@@ -257,7 +357,7 @@ const loadUsers = async () => {
 // 加载角色列表
 const loadRoles = async () => {
   try {
-    const result = await getRoleList()
+    const result = await getAllRoles()
     roleList.value = result
   } catch (error) {
     console.error('加载角色列表失败', error)
@@ -317,7 +417,7 @@ const handleEdit = (row: UserInfo) => {
 const handleResetPassword = async (row: UserInfo) => {
   try {
     await ElMessageBox.confirm(
-      `确认要重置用户 "${row.username}" 的密码吗？`,
+      `确认要重置用户 "${row.username}" 的密码吗？重置后密码为：123456`,
       '重置密码',
       {
         confirmButtonText: '确认',
@@ -333,6 +433,69 @@ const handleResetPassword = async (row: UserInfo) => {
       ElMessage.error('重置密码失败')
     }
   }
+}
+
+// 打开修改密码弹窗
+const handleChangePassword = (row: UserInfo) => {
+  passwordFormData.userId = row.id
+  passwordFormData.username = row.username
+  passwordFormData.newPassword = ''
+  passwordFormData.confirmPassword = ''
+  passwordDialogVisible.value = true
+}
+
+// 提交修改密码
+const handleChangePasswordSubmit = async () => {
+  if (!passwordFormRef.value) return
+
+  try {
+    await passwordFormRef.value.validate()
+    passwordSubmitting.value = true
+
+    await changePassword({
+      userId: passwordFormData.userId,
+      newPassword: passwordFormData.newPassword
+    })
+
+    ElMessage.success('修改密码成功')
+
+    // 如果修改的是当前登录用户的密码，需要退出登录
+    if (passwordFormData.userId === userStore.userInfo?.id) {
+      await ElMessageBox.confirm(
+        '密码已修改，需要重新登录',
+        '提示',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'info',
+          showCancelButton: false,
+          closeOnClickModal: false,
+          closeOnPressEscape: false
+        }
+      )
+
+      // 退出登录并跳转到登录页
+      await userStore.logout()
+      router.push('/login')
+    } else {
+      passwordDialogVisible.value = false
+    }
+  } catch (error) {
+    if (error !== false) {
+      ElMessage.error('修改密码失败')
+    }
+  } finally {
+    passwordSubmitting.value = false
+  }
+}
+
+// 关闭修改密码弹窗
+const handlePasswordDialogClose = () => {
+  passwordFormData.userId = ''
+  passwordFormData.username = ''
+  passwordFormData.newPassword = ''
+  passwordFormData.confirmPassword = ''
+  passwordFormRef.value?.resetFields()
 }
 
 // 删除

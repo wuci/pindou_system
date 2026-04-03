@@ -74,6 +74,15 @@ public class OrderInfoResponse implements Serializable {
     @Schema(description = "会员折扣率")
     private Double memberDiscountRate;
 
+    @Schema(description = "支付方式：offline-线下, online-线上, balance-余额, combined-组合")
+    private String paymentMethod;
+
+    @Schema(description = "余额支付金额（元）")
+    private Double balanceAmount;
+
+    @Schema(description = "其他方式支付金额（元）")
+    private Double otherPaymentAmount;
+
     @Schema(description = "支付时间（毫秒时间戳）")
     private Long paidAt;
 

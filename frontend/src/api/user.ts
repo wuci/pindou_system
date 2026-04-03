@@ -86,3 +86,18 @@ export const deleteUser = (id: string) => {
 export const resetPassword = (id: string, password: string) => {
   return http.put(`/users/${id}/reset-password`, { password })
 }
+
+/**
+ * 修改密码参数
+ */
+export interface ChangePasswordParams {
+  userId: string
+  newPassword: string
+}
+
+/**
+ * 修改密码
+ */
+export const changePassword = (data: ChangePasswordParams) => {
+  return http.put(`/users/${data.userId}/reset-password`, { password: data.newPassword })
+}

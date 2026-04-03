@@ -220,6 +220,7 @@ public class LogAspect {
 
     /**
      * 解析 SpEL 表达式
+     * 支持模板式占位符，例如：桌台【#tableId】结束计时
      */
     private String parseSpEL(String spel, ProceedingJoinPoint point, Class<?> targetClass) {
         if (StringUtils.isBlank(spel)) {
@@ -252,13 +253,40 @@ public class LogAspect {
                 }
             }
 
-            // 解析表达式
-            Expression expression = parser.parseExpression(spel);
-            Object value = expression.getValue(context);
-
-            if (value != null) {
-                return value.toString();
+            // 尝试解析整个表达式（兼容纯表达式情况）
+            try {
+                Expression expression = parser.parseExpression(spel);
+                Object value = expression.getValue(context);
+                if (value != null) {
+                    return value.toString();
+                }
+            } catch (Exception e) {
+                // 整个字符串解析失败，尝试模板式替换
+                log.debug("整体解析失败，尝试模板式替换：{}", spel);
             }
+
+            // 模板式替换：查找所有 #xxx 或 #xxx?.yyy 模式并替换
+            String result = spel;
+            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("#(\\w+(?:\\?\\.\\w+)*)(?=[\\]】\\s,，。]|$)");
+            java.util.regex.Matcher matcher = pattern.matcher(result);
+            StringBuffer sb = new StringBuffer();
+
+            while (matcher.find()) {
+                String varExpression = matcher.group(0); // 完整匹配，如 #tableId 或 #request?.memberId
+                try {
+                    Expression expression = parser.parseExpression(varExpression);
+                    Object value = expression.getValue(context);
+                    String replacement = value != null ? value.toString() : "";
+                    matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(replacement));
+                } catch (Exception ex) {
+                    log.debug("解析表达式 {} 失败，保持原样", varExpression);
+                    matcher.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(varExpression));
+                }
+            }
+            matcher.appendTail(sb);
+
+            return sb.toString();
+
         } catch (Exception e) {
             log.warn("解析 SpEL 表达式失败：{}", spel, e);
         }

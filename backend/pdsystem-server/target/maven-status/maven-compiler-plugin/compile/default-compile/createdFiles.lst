@@ -18,6 +18,7 @@ com\pindou\timer\filter\JwtAuthenticationFilter.class
 com\pindou\timer\config\WebSocketConfig.class
 com\pindou\timer\controller\ConfigController.class
 com\pindou\timer\controller\MemberLevelController.class
+com\pindou\timer\controller\PermissionController.class
 com\pindou\timer\config\SecurityConfig.class
 com\pindou\timer\controller\RechargeRecordController.class
 com\pindou\timer\websocket\WebSocketServiceImpl.class

@@ -164,6 +164,17 @@
           <el-icon><InfoFilled /></el-icon>
           <span>{{ combinedPaymentInfo.description }}</span>
         </div>
+        <!-- 会员余额提示 -->
+        <div v-if="selectedPaymentMethod === 'balance' && selectedMember" class="balance-amount-info">
+          <span v-if="isBalanceSufficient" class="balance-sufficient">
+            <el-icon><SuccessFilled /></el-icon>
+            余额充足，当前余额 ¥{{ selectedMember.balance.toFixed(2) }}
+          </span>
+          <span v-else class="balance-insufficient">
+            <el-icon><WarningFilled /></el-icon>
+            余额不足，当前余额 ¥{{ selectedMember.balance.toFixed(2) }}，总需支付 ¥{{ finalAmountForDisplay.toFixed(2) }}（当前订单¥{{ currentOrderOriginalAmount.toFixed(2) }} + 续费¥{{ extendOriginalPrice.toFixed(2) }}），还差 ¥{{ (finalAmountForDisplay - selectedMember.balance).toFixed(2) }}
+          </span>
+        </div>
       </el-form-item>
 
       <!-- 自定义时长输入 -->
@@ -225,8 +236,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled, SuccessFilled, WarningFilled } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import type { TableInfo } from '@/api/table'
 import { extendTable, NON_MEMBER_PAYMENT_METHODS, MEMBER_PAYMENT_METHODS, type PaymentMethod } from '@/api/table'
@@ -287,6 +298,19 @@ const combinedPaymentInfo = computed(() => {
       description: `余额${balance.toFixed(2)}元 + 线下${(totalAmount - balance).toFixed(2)}元`
     }
   }
+})
+
+// 会员余额是否充足
+const isBalanceSufficient = computed(() => {
+  if (!selectedMember.value) return false
+  const balance = selectedMember.value.balance || 0
+  const totalAmount = totalFinalAmount.value || totalOriginalAmount.value || 0
+  return balance >= totalAmount
+})
+
+// 用于显示的最终金额
+const finalAmountForDisplay = computed(() => {
+  return totalFinalAmount.value || totalOriginalAmount.value || 0
 })
 
 // 判断会员是否被锁定（桌台已有会员，不允许修改）
@@ -702,6 +726,25 @@ const handleConfirm = async () => {
   }
 
   console.log('Additional duration:', additionalDuration, 'seconds')
+
+  // 验证会员余额是否足够（仅对会员余额支付方式）
+  if (selectedMember.value && selectedPaymentMethod.value === 'balance') {
+    const memberBalance = selectedMember.value.balance || 0
+    const finalAmount = totalFinalAmount.value || totalOriginalAmount.value || 0
+
+    if (memberBalance < finalAmount) {
+      ElMessageBox.alert(
+        `会员余额不足！<br/>当前余额：¥${memberBalance.toFixed(2)}<br/>总需支付：¥${finalAmount.toFixed(2)}（当前订单¥${(currentOrderOriginalAmount.value || 0).toFixed(2)} + 续费¥${(extendOriginalPrice.value || 0).toFixed(2)}）<br/>还差：¥${(finalAmount - memberBalance).toFixed(2)}`,
+        '余额不足',
+        {
+          confirmButtonText: '知道了',
+          dangerouslyUseHTMLString: true,
+          type: 'warning'
+        }
+      )
+      return
+    }
+  }
 
   loading.value = true
 
@@ -1130,6 +1173,32 @@ const handleMemberSelected = (member: MemberInfo) => {
 
 .combined-payment-info .el-icon {
   font-size: 16px;
+}
+
+.balance-amount-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.balance-sufficient {
+  background-color: #f0f9ff;
+  border: 1px solid #67c23a;
+  color: #67c23a;
+}
+
+.balance-insufficient {
+  background-color: #fef0f0;
+  border: 1px solid #f56c6c;
+  color: #f56c6c;
+}
+
+.balance-amount-info .el-icon {
+  font-size: 14px;
 }
 
 .member-info-detail {

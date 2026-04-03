@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>操作日志</span>
-          <el-button type="primary" :icon="Download" @click="handleExport">
+          <el-button v-if="permissions.canExport" type="primary" :icon="Download" @click="handleExport">
             导出日志
           </el-button>
         </div>
@@ -103,6 +103,7 @@
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
             <el-button
+              v-if="permissions.canViewDetail"
               type="primary"
               size="small"
               link
@@ -160,10 +161,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { getLogs, exportLogs, type LogInfo, type LogQueryParams } from '@/api/log'
+import { useUserStore } from '@/stores/user'
+
+// 用户状态和权限
+const userStore = useUserStore()
+
+const permissions = computed(() => ({
+  canViewDetail: userStore.hasPermission('log:detail'),
+  canExport: userStore.hasPermission('log:export')
+}))
 
 // 数据
 const loading = ref(false)

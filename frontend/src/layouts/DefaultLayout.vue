@@ -44,44 +44,44 @@
             text-color="#bfcbd9"
             active-text-color="#409eff"
           >
-            <el-menu-item index="/dashboard">
-              <el-icon><Dashboard /></el-icon>
+            <el-menu-item index="/dashboard" v-if="permissions.canViewDashboard">
+              <el-icon><Odometer /></el-icon>
               <span>工作台</span>
             </el-menu-item>
-            <el-menu-item index="/tables">
+            <el-menu-item index="/tables" v-if="permissions.canViewTables">
               <el-icon><Grid /></el-icon>
               <span>桌台管理</span>
             </el-menu-item>
-            <el-menu-item index="/orders">
+            <el-menu-item index="/orders" v-if="permissions.canViewOrders">
               <el-icon><Document /></el-icon>
               <span>订单管理</span>
             </el-menu-item>
-            <el-menu-item index="/reports">
+            <el-menu-item index="/reports" v-if="permissions.canViewStatistics">
               <el-icon><DataAnalysis /></el-icon>
               <span>数据统计</span>
             </el-menu-item>
-            <el-menu-item index="/users" v-if="hasPermission('user:view')">
+            <el-menu-item index="/users" v-if="permissions.canViewUsers">
               <el-icon><User /></el-icon>
               <span>用户管理</span>
             </el-menu-item>
-            <el-menu-item index="/roles" v-if="hasPermission('role:manage')">
+            <el-menu-item index="/roles" v-if="permissions.canViewRoles">
               <el-icon><Lock /></el-icon>
               <span>角色管理</span>
             </el-menu-item>
-            <el-menu-item index="/logs" v-if="hasPermission('log:view')">
-              <el-icon><Tickets /></el-icon>
+            <el-menu-item index="/logs" v-if="permissions.canViewLogs">
+              <el-icon><Notebook /></el-icon>
               <span>操作日志</span>
             </el-menu-item>
-            <el-menu-item index="/members">
+            <el-menu-item index="/members" v-if="permissions.canViewMembers">
               <el-icon><User /></el-icon>
               <span>会员管理</span>
             </el-menu-item>
-            <el-menu-item index="/member-levels">
+            <el-menu-item index="/member-levels" v-if="permissions.canViewMemberLevels">
               <el-icon><Star /></el-icon>
               <span>会员等级</span>
             </el-menu-item>
-            <el-menu-item index="/settings" v-if="hasPermission('system:config')">
-              <el-icon><Setting /></el-icon>
+            <el-menu-item index="/settings" v-if="permissions.canViewSettings">
+              <el-icon><Tools /></el-icon>
               <span>系统设置</span>
             </el-menu-item>
           </el-menu>
@@ -110,7 +110,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useWebSocketStore } from '@/stores/websocket'
 import { ElMessageBox } from 'element-plus'
-import { Bell, Star } from '@element-plus/icons-vue'
+import { Bell, User, SwitchButton, Odometer, Grid, Document, DataAnalysis, Lock, Notebook, Star, Tools } from '@element-plus/icons-vue'
 import RemindPanel from '@/components/RemindPanel.vue'
 
 const router = useRouter()
@@ -123,9 +123,39 @@ const remindPanelRef = ref<InstanceType<typeof RemindPanel>>()
 const remindCount = ref(0)
 const hasNewRemind = ref(false)
 
-const hasPermission = (permission: string) => {
-  return userStore.hasPermission(permission)
+/**
+ * 检查是否有指定模块下的任意权限
+ * @param prefix 权限前缀，如 'table:'、'member:'
+ */
+const hasModulePermission = (prefix: string): boolean => {
+  if (!userStore.permissions || userStore.permissions.length === 0) {
+    return false
+  }
+  // 超级管理员
+  if (userStore.permissions.includes('*')) {
+    return true
+  }
+  // 检查是否有任意以该前缀开头的权限
+  return userStore.permissions.some(p => p.startsWith(prefix))
 }
+
+// 使用 computed 缓存权限判断，避免频繁重新计算
+const permissions = computed(() => ({
+  canViewDashboard: userStore.hasPermission('dashboard:view'),
+  // 桌台管理：有任意 table: 开头的权限即可显示
+  canViewTables: hasModulePermission('table:'),
+  canViewOrders: userStore.hasPermission('order:view'),
+  canViewStatistics: userStore.hasPermission('statistics:view'),
+  canViewUsers: userStore.hasPermission('user:view'),
+  canViewRoles: userStore.hasPermission('role:view'),
+  canViewLogs: userStore.hasPermission('log:view'),
+  // 会员管理：有任意 member: 开头的权限即可显示
+  canViewMembers: hasModulePermission('member:'),
+  // 会员等级：有任意 member:level: 开头的权限即可显示
+  canViewMemberLevels: hasModulePermission('member:level:'),
+  // 系统设置：有任意 system: 开头的权限即可显示
+  canViewSettings: hasModulePermission('system:')
+}))
 
 const handleCommand = (command: string) => {
   if (command === 'logout') {
@@ -178,6 +208,11 @@ onMounted(() => {
 .layout-container {
   width: 100%;
   height: 100vh;
+  overflow: hidden;
+
+  :deep(.el-container) {
+    height: 100%;
+  }
 }
 
 .layout-header {
@@ -266,11 +301,14 @@ onMounted(() => {
 .layout-aside {
   background-color: #304156;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .layout-main {
   background-color: #f0f2f5;
   padding: 20px;
   overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
 }
 </style>

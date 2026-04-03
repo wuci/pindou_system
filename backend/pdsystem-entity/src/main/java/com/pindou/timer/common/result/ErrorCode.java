@@ -58,7 +58,14 @@ public enum ErrorCode {
     MEMBER_LEVEL_NOT_FOUND(51001, "会员等级不存在"),
     MEMBER_LEVEL_NAME_EXISTS(51002, "会员等级名称已存在"),
     MEMBER_LEVEL_IN_USE(51003, "会员等级正在使用中，无法删除"),
-    MEMBER_LEVEL_DEFAULT(51004, "默认会员等级不能删除");
+    MEMBER_LEVEL_DEFAULT(51004, "默认会员等级不能删除"),
+
+    // ========== 权限相关错误码 60xxx ==========
+    PERMISSION_NOT_FOUND(60001, "权限不存在"),
+    PERMISSION_KEY_EXISTS(60002, "权限编码已存在"),
+    PERMISSION_BUILTIN_NOT_MODIFIABLE(60003, "内置权限不允许修改"),
+    PERMISSION_BUILTIN_NOT_DELETABLE(60004, "内置权限不允许删除"),
+    PERMISSION_HAS_CHILDREN(60005, "存在子权限，不允许删除");
 
     /**
      * 状态码

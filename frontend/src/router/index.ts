@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -25,8 +26,8 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/Dashboard/index.vue'),
         meta: {
           title: '工作台',
-          icon: 'Dashboard',
-          permission: 'table:view'
+          icon: 'Odometer',
+          permission: 'dashboard:view'
         }
       },
       {
@@ -56,7 +57,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '数据统计',
           icon: 'DataAnalysis',
-          permission: 'report:view'
+          permission: 'statistics:view'
         }
       },
       {
@@ -115,8 +116,8 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/Settings/index.vue'),
         meta: {
           title: '系统设置',
-          icon: 'Setting',
-          permission: 'system:config'
+          icon: 'Tools',
+          permission: 'system:view'
         }
       }
     ]
@@ -135,6 +136,33 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
+
+/**
+ * 检查是否有指定模块下的任意权限
+ * @param permissions 用户权限列表
+ * @param permission 路由要求的权限
+ * @returns 是否有权限
+ */
+const checkModulePermission = (permissions: string[], permission: string): boolean => {
+  // 超级管理员
+  if (permissions.includes('*')) {
+    return true
+  }
+
+  // 先检查精确匹配
+  if (permissions.includes(permission)) {
+    return true
+  }
+
+  // 如果要求的权限是 xxx:view 格式，检查是否有该模块下的任意权限
+  // 例如：table:view -> 检查是否有 table: 开头的任意权限
+  if (permission.endsWith(':view')) {
+    const prefix = permission.substring(0, permission.lastIndexOf(':') + 1)
+    return permissions.some(p => p.startsWith(prefix))
+  }
+
+  return false
+}
 
 /**
  * 路由守卫
@@ -171,10 +199,12 @@ router.beforeEach((to, from, next) => {
 
       // 检查权限（只有已登录用户才检查权限）
       if (to.meta.permission) {
-        if (!userStore.hasPermission(to.meta.permission as string)) {
-          console.log('无权限，重定向到登录页')
-          // 无权限跳转登录页（更安全的做法）
-          next({ path: '/login' })
+        const requiredPermission = to.meta.permission as string
+        if (!checkModulePermission(userStore.permissions, requiredPermission)) {
+          console.log('无权限，重定向到首页。需要权限:', requiredPermission, '用户权限:', userStore.permissions)
+          // 已登录用户无权限时，提示并跳转到首页
+          ElMessage.warning('您没有访问该页面的权限')
+          next({ path: '/dashboard' })
           return
         }
       }

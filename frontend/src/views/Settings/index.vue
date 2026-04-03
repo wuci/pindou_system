@@ -3,7 +3,7 @@
     <el-card shadow="never">
       <el-tabs v-model="activeTab">
         <!-- 计费规则 -->
-        <el-tab-pane label="计费规则" name="billing">
+        <el-tab-pane v-if="permissions.canConfigRule" label="计费规则" name="billing">
           <div class="tab-content">
             <!-- 渠道选择和管理 -->
             <div class="channel-tabs">
@@ -23,7 +23,7 @@
                 @click="showAddChannelDialog"
                 style="margin-left: 12px"
               >
-                添加渠道
+                添加计费方式
               </el-button>
               <el-button
                 v-if="billingData.channels.length > 1"
@@ -32,7 +32,7 @@
                 size="small"
                 @click="handleDeleteChannel"
               >
-                删除渠道
+                删除计费方式
               </el-button>
             </div>
 
@@ -81,7 +81,7 @@
                     <div class="rule-price">
                       <el-input-number
                         v-model="rule.price"
-                        :min="0.01"
+                        :min="0"
                         :max="999.99"
                         :precision="2"
                         :step="0.5"
@@ -154,7 +154,7 @@
         </el-tab-pane>
 
         <!-- 提醒配置 -->
-        <el-tab-pane label="提醒配置" name="remind">
+        <el-tab-pane v-if="permissions.canConfigRemind" label="提醒配置" name="remind">
           <div class="tab-content">
             <el-form
               ref="remindFormRef"
@@ -220,7 +220,7 @@
         </el-tab-pane>
 
         <!-- 系统参数配置 -->
-        <el-tab-pane label="系统参数配置" name="system">
+        <el-tab-pane v-if="permissions.canConfigParam" label="系统参数配置" name="system">
           <div class="tab-content">
             <el-form
               ref="systemFormRef"
@@ -330,9 +330,30 @@ import {
   type RemindConfig,
   type SystemConfig
 } from '@/api/config'
+import { useUserStore } from '@/stores/user'
 
-// 当前激活的标签
+// 用户状态和权限
+const userStore = useUserStore()
+
+const permissions = computed(() => ({
+  canConfigRule: userStore.hasPermission('system:rule'),
+  canConfigRemind: userStore.hasPermission('system:remind'),
+  canConfigParam: userStore.hasPermission('system:param')
+}))
+
+// 当前激活的标签 - 根据权限自动选择第一个有权限的tab
 const activeTab = ref('billing')
+
+// 根据权限设置默认tab
+onMounted(() => {
+  if (permissions.value.canConfigRule) {
+    activeTab.value = 'billing'
+  } else if (permissions.value.canConfigRemind) {
+    activeTab.value = 'remind'
+  } else if (permissions.value.canConfigParam) {
+    activeTab.value = 'system'
+  }
+})
 
 // 计费规则相关
 const activeChannel = ref<string>('store')
@@ -631,8 +652,8 @@ const saveBillingRule = async () => {
           return
         }
       }
-      if (!rule.price || rule.price < 0.01) {
-        ElMessage.warning(`${channel.channelName}的规则价格必须大于0元`)
+      if (rule.price == null || rule.price < 0) {
+        ElMessage.warning(`${channel.channelName}的规则价格不能为负数`)
         return
       }
     }

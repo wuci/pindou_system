@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>会员管理</span>
-          <el-button type="primary" :icon="Plus" @click="handleAdd">
+          <el-button v-if="permissions.canCreate" type="primary" :icon="Plus" @click="handleAdd">
             新增会员
           </el-button>
         </div>
@@ -65,16 +65,16 @@
         </el-table-column>
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
-            <el-button type="success" size="small" link @click="handleRecharge(row)">
+            <el-button v-if="permissions.canRecharge" type="success" size="small" link @click="handleRecharge(row)">
               充值
             </el-button>
-            <el-button type="info" size="small" link @click="handleViewRecords(row)">
+            <el-button v-if="permissions.canViewRecord" type="info" size="small" link @click="handleViewRecords(row)">
               查看记录
             </el-button>
-            <el-button type="primary" size="small" link @click="handleEdit(row)">
+            <el-button v-if="permissions.canUpdate" type="primary" size="small" link @click="handleEdit(row)">
               编辑
             </el-button>
-            <el-button type="danger" size="small" link @click="handleDelete(row)">
+            <el-button v-if="permissions.canDelete" type="danger" size="small" link @click="handleDelete(row)">
               删除
             </el-button>
           </template>
@@ -254,9 +254,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 import {
   getMemberList,
   createMember,
@@ -271,6 +272,18 @@ import {
   type ConsumptionRecord
 } from '@/api/member'
 import RechargeDialog from '@/components/RechargeDialog.vue'
+
+// 用户状态
+const userStore = useUserStore()
+
+// 权限检查
+const permissions = computed(() => ({
+  canCreate: userStore.hasPermission('member:create'),
+  canUpdate: userStore.hasPermission('member:update'),
+  canDelete: userStore.hasPermission('member:delete'),
+  canRecharge: userStore.hasPermission('member:recharge'),
+  canViewRecord: userStore.hasPermission('member:record')
+}))
 
 // 数据
 const loading = ref(false)

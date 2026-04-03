@@ -259,6 +259,15 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // 设置支付方式信息
+        if (order.getPaymentMethod() != null) {
+            response.setPaymentMethod(order.getPaymentMethod());
+            response.setBalanceAmount(order.getBalanceAmount() != null ?
+                order.getBalanceAmount().doubleValue() : null);
+            response.setOtherPaymentAmount(order.getOtherPaymentAmount() != null ?
+                order.getOtherPaymentAmount().doubleValue() : null);
+        }
+
         return response;
     }
 
@@ -373,6 +382,15 @@ public class OrderServiceImpl implements OrderService {
             } catch (Exception e) {
                 log.warn("获取订单详情会员信息失败: orderId={}, memberId={}, error={}", order.getId(), order.getMemberId(), e.getMessage());
             }
+        }
+
+        // 设置支付方式信息
+        if (order.getPaymentMethod() != null) {
+            response.setPaymentMethod(order.getPaymentMethod());
+            response.setBalanceAmount(order.getBalanceAmount() != null ?
+                order.getBalanceAmount().doubleValue() : null);
+            response.setOtherPaymentAmount(order.getOtherPaymentAmount() != null ?
+                order.getOtherPaymentAmount().doubleValue() : null);
         }
 
         // 构建时间线

@@ -3,13 +3,16 @@ D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\time
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\TableCategoryServiceImpl.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\UserService.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\StatisticsService.java
+D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\PermissionMapper.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\UserMapper.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\MemberLevelServiceImpl.java
+D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\PermissionService.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\UserServiceImpl.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\MemberService.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\ConsumptionRecordService.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\StatisticsServiceImpl.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\OperationLogMapper.java
+D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\PermissionServiceImpl.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\RemindServiceImpl.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\ConsumptionRecordMapper.java
 D:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\TableLayoutConfigServiceImpl.java

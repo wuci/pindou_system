@@ -18,7 +18,7 @@
           <Edit />
         </el-icon>
         <!-- 预定按钮（放在名称右边，使用图标） -->
-        <template v-if="table.status === 'idle'">
+        <template v-if="table.status === 'idle' && permissions.canReserve">
           <el-tooltip
             v-if="table.reservationStatus === 'reserved'"
             content="取消预定"
@@ -186,29 +186,29 @@
     <div class="table-card__actions">
       <template v-if="table.status === 'idle'">
         <!-- 已预订状态不显示开始计时按钮 -->
-        <el-button v-if="table.reservationStatus !== 'reserved'" type="primary" size="small" @click.stop="$emit('start', table)">
+        <el-button v-if="table.reservationStatus !== 'reserved' && permissions.canStart" type="primary" size="small" @click.stop="$emit('start', table)">
           开始计时
         </el-button>
       </template>
       <template v-else-if="table.status === 'using'">
-        <el-button size="small" @click.stop="$emit('pause', table)">
+        <el-button v-if="permissions.canPause" size="small" @click.stop="$emit('pause', table)">
           暂停
         </el-button>
-        <el-button type="warning" size="small" @click.stop="$emit('extend', table)">
+        <el-button v-if="permissions.canExtend" type="warning" size="small" @click.stop="$emit('extend', table)">
           续费
         </el-button>
-        <el-button type="success" size="small" @click.stop="$emit('end', table)">
+        <el-button v-if="permissions.canBill" type="success" size="small" @click.stop="$emit('end', table)">
           结账
         </el-button>
       </template>
       <template v-else-if="table.status === 'paused'">
-        <el-button type="primary" size="small" @click.stop="$emit('resume', table)">
+        <el-button v-if="permissions.canPause" type="primary" size="small" @click.stop="$emit('resume', table)">
           继续
         </el-button>
-        <el-button type="warning" size="small" @click.stop="$emit('extend', table)">
+        <el-button v-if="permissions.canExtend" type="warning" size="small" @click.stop="$emit('extend', table)">
           续费
         </el-button>
-        <el-button type="success" size="small" @click.stop="$emit('end', table)">
+        <el-button v-if="permissions.canBill" type="success" size="small" @click.stop="$emit('end', table)">
           结账
         </el-button>
       </template>
@@ -227,6 +227,19 @@
 import { computed } from 'vue'
 import { Clock, CircleCheck, Edit, Calendar } from '@element-plus/icons-vue'
 import type { TableInfo } from '@/api/table'
+import { useUserStore } from '@/stores/user'
+
+// 用户状态和权限
+const userStore = useUserStore()
+
+const permissions = computed(() => ({
+  canStart: userStore.hasPermission('table:start'),
+  canPause: userStore.hasPermission('table:pause'),
+  canEnd: userStore.hasPermission('table:end'),
+  canExtend: userStore.hasPermission('table:extend'),
+  canReserve: userStore.hasPermission('table:reserve'),
+  canBill: userStore.hasPermission('table:bill')
+}))
 
 interface Props {
   table: TableInfo

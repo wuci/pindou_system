@@ -62,10 +62,6 @@
             <span class="label">计费时长</span>
             <span class="value highlight">{{ formatDuration(detail.actualDuration) }}</span>
           </div>
-          <div v-if="detail.paidAt" class="info-item">
-            <span class="label">支付时间</span>
-            <span class="value">{{ formatDateTime(detail.paidAt) }}</span>
-          </div>
         </div>
       </section>
 
@@ -92,6 +88,31 @@
           <div class="amount-item total">
             <span class="label">实付金额</span>
             <span class="value total-amount">¥{{ formatMoney(detail.amount) }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 支付方式信息 -->
+      <section v-if="detail.paymentMethod" class="detail-section">
+        <h3 class="section-title">支付方式</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">支付方式</span>
+            <el-tag :type="getPaymentMethodTagType(detail.paymentMethod)" size="small">
+              {{ getPaymentMethodLabel(detail.paymentMethod) }}
+            </el-tag>
+          </div>
+          <div v-if="detail.balanceAmount > 0" class="info-item">
+            <span class="label">余额支付</span>
+            <span class="value balance">¥{{ formatMoney(detail.balanceAmount) }}</span>
+          </div>
+          <div v-if="detail.otherPaymentAmount > 0" class="info-item">
+            <span class="label">线下支付</span>
+            <span class="value offline">¥{{ formatMoney(detail.otherPaymentAmount) }}</span>
+          </div>
+          <div v-if="detail.paidAt" class="info-item">
+            <span class="label">支付时间</span>
+            <span class="value">{{ formatDateTime(detail.paidAt) }}</span>
           </div>
         </div>
       </section>
@@ -238,6 +259,28 @@ const formatDuration = (seconds: number) => {
 const formatMoney = (amount: number) => {
   return amount.toFixed(2)
 }
+
+// 获取支付方式标签
+const getPaymentMethodLabel = (method: string) => {
+  const labels: Record<string, string> = {
+    offline: '线下支付',
+    online: '线上支付',
+    balance: '会员余额',
+    combined: '组合支付'
+  }
+  return labels[method] || method
+}
+
+// 获取支付方式标签类型
+const getPaymentMethodTagType = (method: string) => {
+  const types: Record<string, string> = {
+    offline: '',
+    online: 'primary',
+    balance: 'success',
+    combined: 'warning'
+  }
+  return types[method] || ''
+}
 </script>
 
 <style scoped>
@@ -300,6 +343,16 @@ const formatMoney = (amount: number) => {
 .info-item .value.discount {
   font-weight: 600;
   color: #67c23a;
+}
+
+.info-item .value.balance {
+  font-weight: 600;
+  color: #67c23a;
+}
+
+.info-item .value.offline {
+  font-weight: 600;
+  color: #f56c6c;
 }
 
 .amount-list {

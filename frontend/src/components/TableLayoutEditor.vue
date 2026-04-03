@@ -28,7 +28,7 @@
           <!-- 批量操作按钮 -->
           <template v-if="localSelectedIds.size > 0">
             <span class="selected-count">已选择 {{ localSelectedIds.size }} 个桌台</span>
-            <el-button type="danger" @click="handleBatchDelete" :icon="Delete">批量删除</el-button>
+            <el-button v-if="permissions.canBatchDelete" type="danger" @click="handleBatchDelete" :icon="Delete">批量删除</el-button>
             <el-button @click="clearSelection">取消选择</el-button>
           </template>
           <!-- 编辑模式按钮 -->
@@ -276,11 +276,20 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Grid, Position, RefreshLeft, Check, Edit, Close, Delete, InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 import TableCard from './TableCard.vue'
 import type { TableInfo } from '@/api/table'
 import { getLayoutConfig, saveLayoutConfig, type TableLayoutItem } from '@/api/tableLayout'
 import { deleteTable, batchDeleteTables, updateTable } from '@/api/table'
 import { getSystemConfig, type SystemConfig } from '@/api/config'
+
+// 用户状态
+const userStore = useUserStore()
+
+// 权限检查
+const permissions = computed(() => ({
+  canBatchDelete: userStore.hasPermission('table:delete')
+}))
 
 interface LayoutTable extends TableInfo {
   x: number

@@ -15,8 +15,8 @@
           :class="{ 'is-default': category.id === 0 }"
         >
           <div class="category-info">
-            <el-icon v-if="category.icon" class="category-icon">
-              <component :is="category.icon" />
+            <el-icon v-if="category.icon && iconMap[category.icon]" class="category-icon">
+              <component :is="iconMap[category.icon]" />
             </el-icon>
             <span class="category-name">{{ category.name }}</span>
             <el-tag size="small" type="info">{{ category.tableCount }}个桌台</el-tag>
@@ -94,7 +94,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Grid, List, Star, OfficeBuilding, House } from '@element-plus/icons-vue'
 import {
   getCategories,
   createCategory,
@@ -138,6 +138,15 @@ const rules: FormRules = {
   name: [
     { required: true, message: '请输入分类名称', trigger: 'blur' }
   ]
+}
+
+// 图标组件映射
+const iconMap = {
+  Grid,
+  List,
+  Star,
+  OfficeBuilding,
+  House
 }
 
 // 排序后的分类列表（默认分类排在第一位）

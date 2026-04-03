@@ -20,20 +20,20 @@
             <!-- 批量操作按钮 -->
             <template v-if="batchSelectionMode">
               <span class="selected-count">已选择 {{ selectedTableIds.size }} 个桌台</span>
-              <el-button type="danger" :icon="Delete" size="small" @click="handleBatchDelete" :disabled="selectedTableIds.size === 0">
+              <el-button v-if="permissions.canBatchDelete" type="danger" :icon="Delete" size="small" @click="handleBatchDelete" :disabled="selectedTableIds.size === 0">
                 批量删除
               </el-button>
               <el-button size="small" @click="exitBatchSelectMode">退出选择</el-button>
             </template>
             <!-- 正常操作按钮 -->
             <template v-else>
-              <el-button type="primary" :icon="Setting" size="small" @click="showCategoryDialog = true">
+              <el-button v-if="permissions.canManageCategories" type="primary" :icon="Setting" size="small" @click="showCategoryDialog = true">
                 分类管理
               </el-button>
-              <el-button v-if="currentCategory !== 0" type="primary" :icon="Setting" size="small" @click="showConfigDialog = true">
+              <el-button v-if="currentCategory !== 0 && permissions.canConfig" type="primary" :icon="Setting" size="small" @click="showConfigDialog = true">
                 桌台配置
               </el-button>
-              <el-button type="warning" :icon="Delete" size="small" @click="enterBatchSelectMode">
+              <el-button v-if="permissions.canBatchDelete" type="warning" :icon="Delete" size="small" @click="enterBatchSelectMode">
                 批量删除
               </el-button>
               <el-button :icon="Refresh" size="small" @click="refreshTables" :loading="loading">
@@ -50,8 +50,8 @@
               :class="['category-tab', { active: currentCategory === category.id }]"
               @click="switchCategory(category.id)"
             >
-              <el-icon v-if="category.icon">
-                <component :is="category.icon" />
+              <el-icon v-if="category.icon && iconMap[category.icon]">
+                <component :is="iconMap[category.icon]" />
               </el-icon>
               <span>{{ category.name }}</span>
               <span class="count">({{ category.tableCount }})</span>
@@ -143,8 +143,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { Setting, Refresh, Delete, Search } from '@element-plus/icons-vue'
+import { Setting, Refresh, Delete, Search, Grid, List, Star, OfficeBuilding, House } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 import { getTableList, batchDeleteTables, cancelReservation, type TableInfo } from '@/api/table'
 import { getCategories, type TableCategoryResponse } from '@/api/tableCategory'
 import TableLayoutEditor from '@/components/TableLayoutEditor.vue'
@@ -155,6 +156,16 @@ import ReservationDialog from '@/components/ReservationDialog.vue'
 import TableConfigDialog from './components/TableConfigDialog.vue'
 import EditTableDialog from './components/EditTableDialog.vue'
 import CategoryDialog from './components/CategoryDialog.vue'
+
+// 用户状态
+const userStore = useUserStore()
+
+// 权限检查
+const permissions = computed(() => ({
+  canManageCategories: userStore.hasPermission('table:config'),
+  canConfig: userStore.hasPermission('table:config'),
+  canBatchDelete: userStore.hasPermission('table:delete')
+}))
 
 // 数据
 const tables = ref<TableInfo[]>([])
@@ -173,6 +184,15 @@ const showConfigDialog = ref(false)
 const showEditDialog = ref(false)
 const showCategoryDialog = ref(false)
 const searchKeyword = ref('')
+
+// 图标组件映射
+const iconMap = {
+  Grid,
+  List,
+  Star,
+  OfficeBuilding,
+  House
+}
 
 let refreshTimer: number | null = null
 

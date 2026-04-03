@@ -5,10 +5,10 @@
         <div class="card-header">
           <span>会员等级配置</span>
           <div>
-            <el-button type="success" :icon="Refresh" @click="handleInitDefault">
+            <el-button v-if="permissions.canInit" type="success" :icon="Refresh" @click="handleInitDefault">
               初始化默认等级
             </el-button>
-            <el-button type="primary" :icon="Plus" @click="handleAdd">
+            <el-button v-if="permissions.canCreate" type="primary" :icon="Plus" @click="handleAdd">
               新增等级
             </el-button>
           </div>
@@ -46,10 +46,10 @@
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" link @click="handleEdit(row)">
+            <el-button v-if="permissions.canUpdate" type="primary" size="small" link @click="handleEdit(row)">
               编辑
             </el-button>
-            <el-button type="danger" size="small" link @click="handleDelete(row)">
+            <el-button v-if="permissions.canDelete" type="danger" size="small" link @click="handleDelete(row)">
               删除
             </el-button>
           </template>
@@ -131,9 +131,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 import {
   getMemberLevelList,
   createMemberLevel,
@@ -144,6 +145,17 @@ import {
   type CreateMemberLevelParams,
   type UpdateMemberLevelParams
 } from '@/api/memberLevel'
+
+// 用户状态
+const userStore = useUserStore()
+
+// 权限检查
+const permissions = computed(() => ({
+  canInit: userStore.hasPermission('member:level:init'),
+  canCreate: userStore.hasPermission('member:level:create'),
+  canUpdate: userStore.hasPermission('member:level:update'),
+  canDelete: userStore.hasPermission('member:level:delete')
+}))
 
 // 数据
 const loading = ref(false)

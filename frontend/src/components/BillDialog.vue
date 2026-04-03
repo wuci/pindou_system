@@ -94,14 +94,32 @@
           <div class="payment-method-title">支付方式</div>
           <div class="payment-method-info">
             <div class="payment-method-name">{{ getPaymentMethodLabel(bill.paymentMethod) }}</div>
-            <div v-if="bill.paymentMethod === 'balance' || bill.paymentMethod === 'combined'" class="payment-breakdown">
-              <div v-if="bill.balanceAmount && bill.balanceAmount > 0" class="payment-breakdown-item">
-                <span class="breakdown-label">余额支付：</span>
-                <span class="breakdown-value">¥{{ formatMoney(bill.balanceAmount) }}</span>
+            <!-- 组合支付明细 -->
+            <div v-if="bill.paymentMethod === 'combined' && (bill.balanceAmount >= 0 || bill.otherPaymentAmount >= 0)" class="payment-breakdown">
+              <div class="payment-breakdown-header">支付明细</div>
+              <div v-if="bill.balanceAmount != null && bill.balanceAmount > 0" class="payment-breakdown-item balance">
+                <span class="breakdown-label">
+                  <el-icon><WalletFilled /></el-icon>
+                  会员余额支付
+                </span>
+                <span class="breakdown-value">-¥{{ formatMoney(bill.balanceAmount) }}</span>
               </div>
-              <div v-if="bill.otherPaymentAmount && bill.otherPaymentAmount > 0" class="payment-breakdown-item">
-                <span class="breakdown-label">其他支付：</span>
-                <span class="breakdown-value">¥{{ formatMoney(bill.otherPaymentAmount) }}</span>
+              <div v-if="bill.otherPaymentAmount != null && bill.otherPaymentAmount > 0" class="payment-breakdown-item offline">
+                <span class="breakdown-label">
+                  <el-icon><ShoppingCart /></el-icon>
+                  线下支付
+                </span>
+                <span class="breakdown-value">-¥{{ formatMoney(bill.otherPaymentAmount) }}</span>
+              </div>
+            </div>
+            <!-- 余额支付明细 -->
+            <div v-if="bill.paymentMethod === 'balance' && bill.balanceAmount != null && bill.balanceAmount >= 0" class="payment-breakdown">
+              <div class="payment-breakdown-item balance">
+                <span class="breakdown-label">
+                  <el-icon><WalletFilled /></el-icon>
+                  会员余额支付
+                </span>
+                <span class="breakdown-value">-¥{{ formatMoney(bill.balanceAmount) }}</span>
               </div>
             </div>
           </div>
@@ -136,8 +154,9 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { WalletFilled, ShoppingCart } from '@element-plus/icons-vue'
 import { getTableBill, endTable, PAYMENT_METHOD_LABELS } from '@/api/table'
-import type { BillInfo } from '@/api/table'
+import type { BillInfo, EndTableParams } from '@/api/table'
 
 /**
  * 账单弹窗组件
@@ -182,6 +201,13 @@ const loadBill = async () => {
   loading.value = true
   try {
     bill.value = await getTableBill(props.tableId)
+    console.log('=== 账单数据 ===')
+    console.log('支付方式:', bill.value.paymentMethod)
+    console.log('余额支付金额:', bill.value.balanceAmount)
+    console.log('其他支付金额:', bill.value.otherPaymentAmount)
+    console.log('总金额:', bill.value.amountDetail?.totalAmount)
+    console.log('完整账单:', bill.value)
+    console.log('===============')
   } catch (error) {
     ElMessage.error('获取账单失败')
     console.error(error)
@@ -195,11 +221,20 @@ const handleConfirm = async () => {
 
   confirming.value = true
   try {
-    // 如果账单中有支付方式，则传递支付方式参数
-    const params = bill.value?.paymentMethod
-      ? { paymentMethod: bill.value.paymentMethod }
-      : undefined
-    await endTable(props.tableId, params)
+    // 传递结账参数：会员ID和支付方式
+    const params: EndTableParams = {}
+
+    // 如果账单中有会员信息，传递会员ID
+    if (bill.value?.member?.id) {
+      params.memberId = bill.value.member.id
+    }
+
+    // 如果账单中有支付方式，传递支付方式
+    if (bill.value?.paymentMethod) {
+      params.paymentMethod = bill.value.paymentMethod
+    }
+
+    await endTable(props.tableId, Object.keys(params).length > 0 ? params : undefined)
     ElMessage.success('结账成功')
     emit('confirmed')
     emit('update:modelValue', false)
@@ -403,9 +438,16 @@ const getPaymentMethodLabel = (method: string) => {
 .payment-breakdown {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 12px;
   padding-left: 12px;
+}
+
+.payment-breakdown-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 4px;
 }
 
 .payment-breakdown-item {
@@ -413,14 +455,50 @@ const getPaymentMethodLabel = (method: string) => {
   justify-content: space-between;
   align-items: center;
   font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.payment-breakdown-item.balance {
+  background-color: #e7f7e9;
+  border-left: 3px solid #67c23a;
+}
+
+.payment-breakdown-item.offline {
+  background-color: #fef0f0;
+  border-left: 3px solid #f56c6c;
 }
 
 .breakdown-label {
   color: #606266;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.breakdown-label .el-icon {
+  font-size: 14px;
+}
+
+.payment-breakdown-item.balance .breakdown-label {
+  color: #67c23a;
+}
+
+.payment-breakdown-item.offline .breakdown-label {
+  color: #f56c6c;
 }
 
 .breakdown-value {
-  color: #409eff;
-  font-weight: 500;
+  color: #303133;
+  font-weight: 600;
+}
+
+.payment-breakdown-item.balance .breakdown-value {
+  color: #67c23a;
+}
+
+.payment-breakdown-item.offline .breakdown-value {
+  color: #f56c6c;
 }
 </style>

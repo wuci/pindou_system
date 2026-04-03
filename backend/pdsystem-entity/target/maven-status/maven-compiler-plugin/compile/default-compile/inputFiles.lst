@@ -1,4 +1,5 @@
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CalculateDiscountResponse.java
+D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\PermissionResponse.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRule.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LogInfoResponse.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRuleItemRequest.java
@@ -35,6 +36,7 @@ D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RechargeRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\TableCategory.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RoleQueryRequest.java
+D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\common\exception\PDException.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RevenueTrendRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\OrderDetailResponse.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RoleInfoResponse.java
@@ -53,6 +55,7 @@ D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\StartTimerRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ChannelBillingRuleRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RevenueTrendItem.java
+D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\Permission.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRuleConfigRequest.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\MemberResponse.java
 D:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\DailyStatsResponse.java

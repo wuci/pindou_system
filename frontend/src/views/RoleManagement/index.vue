@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>角色管理</span>
-          <el-button type="primary" :icon="Plus" @click="handleAdd">
+          <el-button v-if="permissions.canCreate" type="primary" :icon="Plus" @click="handleAdd">
             新增角色
           </el-button>
         </div>
@@ -83,15 +83,15 @@
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" link @click="handleEdit(row)">
+            <el-button v-if="permissions.canUpdate" type="primary" size="small" link @click="handleEdit(row)">
               编辑
             </el-button>
             <el-button
+              v-if="permissions.canDelete && row.code !== 'super_admin'"
               type="danger"
               size="small"
               link
               @click="handleDelete(row)"
-              :disabled="row.isBuiltIn === 1"
             >
               删除
             </el-button>
@@ -195,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, nextTick, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import PermissionTree from '@/components/PermissionTree.vue'
@@ -208,6 +208,16 @@ import {
   type CreateRoleParams,
   type UpdateRoleParams
 } from '@/api/role'
+import { useUserStore } from '@/stores/user'
+
+// 用户状态和权限
+const userStore = useUserStore()
+
+const permissions = computed(() => ({
+  canCreate: userStore.hasPermission('role:create'),
+  canUpdate: userStore.hasPermission('role:update'),
+  canDelete: userStore.hasPermission('role:delete')
+}))
 
 // 数据
 const loading = ref(false)
@@ -322,11 +332,6 @@ const handleEdit = (row: RoleInfo) => {
 
 // 删除
 const handleDelete = async (row: RoleInfo) => {
-  if (row.isBuiltIn === 1) {
-    ElMessage.warning('系统内置角色不允许删除')
-    return
-  }
-
   try {
     await ElMessageBox.confirm(
       `确认要删除角色 "${row.name}" 吗？删除后不可恢复！`,
@@ -341,10 +346,15 @@ const handleDelete = async (row: RoleInfo) => {
     await deleteRole(row.id)
     ElMessage.success('删除成功')
     loadRoles()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+  } catch (error: any) {
+    // 点击取消时，error 是 'cancel' 字符串
+    if (error === 'cancel') {
+      return
     }
+
+    // 显示后端返回的具体错误信息
+    const errorMessage = error?.message || '删除失败'
+    ElMessage.error(errorMessage)
   }
 }
 
