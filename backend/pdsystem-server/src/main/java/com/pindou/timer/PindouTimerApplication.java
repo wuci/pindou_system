@@ -26,6 +26,7 @@ public class PindouTimerApplication {
         System.out.println("拼豆店计时管理系统启动成功！");
         System.out.println("接口文档: http://localhost:9026/api/doc.html");
         System.out.println("Druid监控: http://localhost:9026/api/druid/");
+        System.out.println("客户端地址: http://localhost:9026/");
         System.out.println("========================================\n");
     }
 }
