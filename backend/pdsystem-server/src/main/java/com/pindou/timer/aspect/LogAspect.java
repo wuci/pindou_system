@@ -7,8 +7,9 @@ import com.pindou.timer.entity.OperationLog;
 import com.pindou.timer.mapper.OperationLogMapper;
 import com.pindou.timer.service.UserService;
 import com.pindou.timer.util.IpUtil;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -37,10 +38,11 @@ import java.util.UUID;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Aspect
 @Component
 public class LogAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(LogAspect.class);
 
     /**
      * SpEL 表达式解析器

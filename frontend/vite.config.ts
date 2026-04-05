@@ -38,9 +38,13 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist',
+    // 开发环境输出到 dist，生产环境输出到后端 resources/static
+    outDir: process.env.NODE_ENV === 'production'
+      ? '../backend/pdsystem-server/src/main/resources/static'
+      : 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    emptyOutDir: true,
     // 代码分割
     rollupOptions: {
       output: {

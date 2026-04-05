@@ -15,8 +15,8 @@ import javax.annotation.Resource;
  * @since 2026-03-30
  */
 @RestController
-@RequestMapping("/table-layout-config")
-public class TableLayoutConfigController {
+@RequestMapping("/api/table-layout-config")
+public class TableLayoutConfigController extends ETSBaseController {
 
     @Resource
     private TableLayoutConfigService layoutConfigService;

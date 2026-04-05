@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, type Component } from 'vue'
 import { Setting, Refresh, Delete, Search, Grid, List, Star, OfficeBuilding, House } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -186,7 +186,7 @@ const showCategoryDialog = ref(false)
 const searchKeyword = ref('')
 
 // 图标组件映射
-const iconMap = {
+const iconMap: Record<string, Component> = {
   Grid,
   List,
   Star,
@@ -248,12 +248,12 @@ const handleStart = (table: TableInfo) => {
 }
 
 // 暂停
-const handlePause = async (table: TableInfo) => {
+const handlePause = async (_table: TableInfo) => {
   refreshTables()
 }
 
 // 继续
-const handleResume = async (table: TableInfo) => {
+const handleResume = async (_table: TableInfo) => {
   refreshTables()
 }
 
@@ -270,7 +270,7 @@ const handleExtend = (table: TableInfo) => {
 }
 
 // 忽略提醒
-const handleIgnoreRemind = async (table: TableInfo) => {
+const handleIgnoreRemind = async (_table: TableInfo) => {
   refreshTables()
 }
 
@@ -334,11 +334,6 @@ const handleTableSelect = (tableId: number, selected: boolean) => {
   } else {
     selectedTableIds.value.delete(tableId)
   }
-}
-
-// 清除选择
-const clearSelection = () => {
-  selectedTableIds.value.clear()
 }
 
 // 批量删除

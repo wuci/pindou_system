@@ -92,11 +92,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, type Component } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { Plus, Edit, Delete, Grid, List, Star, OfficeBuilding, House } from '@element-plus/icons-vue'
 import {
-  getCategories,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -141,7 +140,7 @@ const rules: FormRules = {
 }
 
 // 图标组件映射
-const iconMap = {
+const iconMap: Record<string, Component> = {
   Grid,
   List,
   Star,

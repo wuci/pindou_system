@@ -3,7 +3,8 @@ package com.pindou.timer.task;
 import com.pindou.timer.dto.RemindInfo;
 import com.pindou.timer.service.RemindService;
 import com.pindou.timer.websocket.WebsocketService;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +17,10 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Component
 public class RemindTask {
+
+    private static final Logger log = LoggerFactory.getLogger(RemindTask.class);
 
     @Resource
     private RemindService remindService;

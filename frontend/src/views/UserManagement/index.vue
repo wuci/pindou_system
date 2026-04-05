@@ -234,7 +234,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
-import { getUserList, createUser, updateUser, deleteUser, resetPassword, changePassword, type UserInfo, type CreateUserParams, type UpdateUserParams } from '@/api/user'
+import { getUserList, createUser, updateUser, deleteUser, resetPassword, changePassword, type UserInfo } from '@/api/user'
 import { getAllRoles } from '@/api/role'
 
 // 用户状态
@@ -300,7 +300,7 @@ const passwordFormData = reactive({
 })
 
 // 自定义验证：确认密码必须与新密码一致
-const validateConfirmPassword = (rule: any, value: any, callback: any) => {
+const validateConfirmPassword = (_rule: any, value: any, callback: any) => {
   if (value === '') {
     callback(new Error('请再次输入密码'))
   } else if (value !== passwordFormData.newPassword) {
@@ -426,7 +426,7 @@ const handleResetPassword = async (row: UserInfo) => {
       }
     )
 
-    await resetPassword(row.id)
+    await resetPassword(row.id, '123456')
     ElMessage.success('重置密码成功，新密码为：123456')
   } catch (error) {
     if (error !== 'cancel') {

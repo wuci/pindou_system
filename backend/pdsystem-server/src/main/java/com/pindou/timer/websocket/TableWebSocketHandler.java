@@ -2,7 +2,8 @@ package com.pindou.timer.websocket;
 
 import cn.hutool.json.JSONUtil;
 import com.pindou.timer.dto.WebSocketMessage;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -19,9 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Component
 public class TableWebSocketHandler extends TextWebSocketHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(TableWebSocketHandler.class);
 
     /**
      * 存储所有在线的WebSocket会话

@@ -1,4 +1,19 @@
 -- =============================================
+-- 拼豆店计时管理系统 - 数据库建表脚本
+-- 版本: 1.0
+-- 数据库: MySQL 8.0+
+-- 日期: 2026-04-04
+-- =============================================
+
+-- 禁用外键检查
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 创建数据库（如果不存在）
+CREATE DATABASE IF NOT EXISTS `pindou_timer` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE `pindou_timer`;
+
+-- =============================================
 -- 1. 用户表 (sys_user)
 -- =============================================
 DROP TABLE IF EXISTS `sys_user`;
@@ -107,8 +122,7 @@ CREATE TABLE `biz_member` (
   UNIQUE KEY `uk_phone` (`phone`),
   KEY `idx_level_id` (`level_id`),
   KEY `idx_total_amount` (`total_amount`),
-  KEY `idx_balance` (`balance`),
-  CONSTRAINT `fk_member_level` FOREIGN KEY (`level_id`) REFERENCES `biz_member_level` (`id`)
+  KEY `idx_balance` (`balance`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员表';
 
 -- =============================================
@@ -122,8 +136,8 @@ CREATE TABLE `biz_table_category` (
   `icon` VARCHAR(50) DEFAULT NULL COMMENT '分类图标',
   `sort_order` INT(11) DEFAULT 0 COMMENT '排序号',
   `remark` VARCHAR(200) DEFAULT NULL COMMENT '备注',
-  `created_at` BIGINT NOT NULL COMMENT '创建时间（毫秒时间戳）',
-  `updated_at` BIGINT NOT NULL COMMENT '更新时间（毫秒时间戳）',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='桌台分类表';
@@ -137,8 +151,8 @@ CREATE TABLE `biz_table_layout_config` (
   `id` BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `category_id` BIGINT(20) NOT NULL COMMENT '分类ID，0表示全局默认布局',
   `config` TEXT NOT NULL COMMENT '布局配置JSON',
-  `created_at` BIGINT NOT NULL COMMENT '创建时间（毫秒时间戳）',
-  `updated_at` BIGINT NOT NULL COMMENT '更新时间（毫秒时间戳）',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_id` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='桌台布局配置表';
@@ -187,14 +201,16 @@ CREATE TABLE `biz_order` (
   `duration` INT NOT NULL DEFAULT 0 COMMENT '总时长（秒）',
   `pause_duration` INT NOT NULL DEFAULT 0 COMMENT '暂停总时长（秒）',
   `preset_duration` INT DEFAULT NULL COMMENT '预设时长（秒）',
+  `channel` VARCHAR(50) DEFAULT 'store' COMMENT '订餐渠道：store-门店,phone-电话,online-线上',
   `status` VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '状态：active=进行中 completed=已完成 cancelled=已作废',
   `payment_method` VARCHAR(20) DEFAULT 'offline' COMMENT '支付方式:offline-线下,online-线上,balance-余额,combined-组合',
   `balance_amount` DECIMAL(10,2) DEFAULT 0 COMMENT '余额支付金额',
   `other_payment_amount` DECIMAL(10,2) DEFAULT 0 COMMENT '其他方式支付金额',
   `amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '总金额',
+  `original_amount` DECIMAL(10,2) DEFAULT 0.00 COMMENT '原价（折扣前）',
   `amount_detail` JSON NOT NULL COMMENT '金额明细',
   `member_id` BIGINT DEFAULT NULL COMMENT '会员ID',
-  `member_discount` DECIMAL(10,2) DEFAULT 1.00 COMMENT '会员折扣金额',
+  `member_discount` DECIMAL(10,2) DEFAULT 0.00 COMMENT '会员折扣金额',
   `operator_id` VARCHAR(36) DEFAULT NULL COMMENT '操作员ID',
   `operator_name` VARCHAR(50) DEFAULT NULL COMMENT '操作员姓名',
   `paid_at` BIGINT DEFAULT NULL COMMENT '支付时间（毫秒时间戳）',
@@ -207,7 +223,8 @@ CREATE TABLE `biz_order` (
   KEY `idx_created_at` (`created_at`),
   KEY `idx_start_time` (`start_time`),
   KEY `idx_payment_method` (`payment_method`),
-  KEY `idx_member_id` (`member_id`)
+  KEY `idx_member_id` (`member_id`),
+  KEY `idx_channel` (`channel`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
 
 -- =============================================
@@ -230,8 +247,7 @@ CREATE TABLE `biz_recharge_record` (
   `created_at` BIGINT NOT NULL COMMENT '创建时间（毫秒时间戳）',
   PRIMARY KEY (`id`),
   KEY `idx_member_id` (`member_id`),
-  KEY `idx_created_at` (`created_at`),
-  CONSTRAINT `fk_recharge_member` FOREIGN KEY (`member_id`) REFERENCES `biz_member` (`id`)
+  KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员充值记录表';
 
 -- =============================================
@@ -253,8 +269,7 @@ CREATE TABLE `biz_consumption_record` (
   PRIMARY KEY (`id`),
   KEY `idx_member_id` (`member_id`),
   KEY `idx_order_id` (`order_id`),
-  KEY `idx_created_at` (`created_at`),
-  CONSTRAINT `fk_consumption_member` FOREIGN KEY (`member_id`) REFERENCES `biz_member` (`id`)
+  KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会员余额消费记录表';
 
 -- =============================================
@@ -299,13 +314,8 @@ CREATE TABLE `sys_config` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
 
 -- =============================================
--- 创建外键约束
--- =============================================
--- 用户表外键
-ALTER TABLE `sys_user` ADD CONSTRAINT `fk_user_role` FOREIGN KEY (`role_id`) REFERENCES `sys_role`(`id`);
-
--- =============================================
--- 索引创建完成
+-- 建表脚本执行完成
+-- 注意：本系统不使用外键约束，通过应用层保证数据一致性
 -- =============================================
 SET FOREIGN_KEY_CHECKS = 1;
 

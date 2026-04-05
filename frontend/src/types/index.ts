@@ -41,7 +41,7 @@ export interface UserInfo {
   roleId: string;
   roleName: string;
   permissions: string[];
-  avatar?: string;
+  avatar?: string | null;
 }
 
 /**

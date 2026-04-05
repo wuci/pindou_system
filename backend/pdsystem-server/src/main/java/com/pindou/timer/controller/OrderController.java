@@ -9,7 +9,8 @@ import com.pindou.timer.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,11 +21,12 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Tag(name = "订单接口", description = "订单管理相关接口")
 @RestController
-@RequestMapping("/orders")
-public class OrderController {
+@RequestMapping("/api/orders")
+public class OrderController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderController.class);
 
     private final OrderService orderService;
 

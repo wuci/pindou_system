@@ -4,8 +4,9 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.reflection.MetaObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
@@ -17,9 +18,10 @@ import java.time.LocalDateTime;
  * @author wuci
  * @since 2026-03-30
  */
-@Slf4j
 @Component
 public class MyBatisPlusConfig implements MetaObjectHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(MyBatisPlusConfig.class);
 
     /**
      * MyBatis-Plus分页插件配置

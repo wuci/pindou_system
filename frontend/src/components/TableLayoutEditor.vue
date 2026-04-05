@@ -273,9 +273,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Grid, Position, RefreshLeft, Check, Edit, Close, Delete, InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Grid, Position, RefreshLeft, Check, Edit, Close, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import TableCard from './TableCard.vue'
 import type { TableInfo } from '@/api/table'
@@ -466,11 +466,6 @@ const initDefaultLayout = () => {
   })
 }
 
-// 切换到布局视图
-const handleSwitchToLayout = () => {
-  viewMode.value = 'layout'
-}
-
 // 保存布局配置
 const saveLayout = async () => {
   try {
@@ -592,7 +587,7 @@ const handleMouseUp = () => {
 }
 
 // 显示右键菜单
-const showContextMenu = (table: LayoutTable, event: MouseEvent) => {
+const showContextMenu = (table: LayoutTable, _event: MouseEvent) => {
   selectedTableId.value = table.id
   contextMenuTable.value = table
   contextMenuVisible.value = true
@@ -633,14 +628,14 @@ const clearSelection = () => {
 
 // 批量删除
 const handleBatchDelete = async () => {
-  if (selectedTableIds.value.size === 0) {
+  if (localSelectedIds.value.size === 0) {
     ElMessage.warning('请先选择要删除的桌台')
     return
   }
 
   try {
     await ElMessageBox.confirm(
-      `确认要删除选中的 ${selectedTableIds.value.size} 个桌台吗？`,
+      `确认要删除选中的 ${localSelectedIds.value.size} 个桌台吗？`,
       '批量删除',
       {
         type: 'warning',
@@ -649,9 +644,9 @@ const handleBatchDelete = async () => {
       }
     )
 
-    await batchDeleteTables(Array.from(selectedTableIds.value))
+    await batchDeleteTables(Array.from(localSelectedIds.value))
     ElMessage.success('删除成功')
-    selectedTableIds.value.clear()
+    localSelectedIds.value.clear()
     emit('refresh')
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -844,6 +839,9 @@ onMounted(() => {
 .table-layout-editor {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* 工具栏 */
@@ -888,13 +886,17 @@ onMounted(() => {
 
 /* 网格视图 */
 .grid-view {
+  flex: 1;
   padding: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .table-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 20px;
+  padding-bottom: 20px;
 }
 
 .table-grid__item {
@@ -1004,9 +1006,12 @@ onMounted(() => {
 
 /* 布局视图 */
 .layout-view {
+  flex: 1;
   position: relative;
-  height: calc(100vh - 200px);
-  min-height: 600px;
+  min-height: 400px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 布局分类提示 */
@@ -1042,12 +1047,14 @@ onMounted(() => {
 .layout-canvas {
   position: relative;
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 100%;
   background: #ffffff;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: auto;
   cursor: default;
   transition: all 0.3s;
+  padding-bottom: 40px;
 }
 
 .layout-canvas--edit {

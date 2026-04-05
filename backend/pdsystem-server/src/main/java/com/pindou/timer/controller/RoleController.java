@@ -10,7 +10,8 @@ import com.pindou.timer.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -23,11 +24,12 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Tag(name = "角色接口", description = "角色管理相关接口")
 @RestController
-@RequestMapping("/roles")
-public class RoleController {
+@RequestMapping("/api/roles")
+public class RoleController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(RoleController.class);
 
     @Resource
     private RoleService roleService;

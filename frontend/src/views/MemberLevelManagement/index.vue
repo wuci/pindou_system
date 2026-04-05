@@ -186,7 +186,7 @@ const formRules: FormRules = {
   minAmount: [
     { required: true, message: '请输入最小累计金额', trigger: 'blur' },
     {
-      validator: (rule, value, callback) => {
+      validator: (_rule, value, callback) => {
         if (formData.maxAmount !== null && value >= formData.maxAmount) {
           callback(new Error('最小金额必须小于最大金额'))
         } else {

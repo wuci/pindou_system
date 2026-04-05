@@ -2,7 +2,8 @@ package com.pindou.timer.common.exception;
 
 import com.pindou.timer.common.result.ErrorCode;
 import com.pindou.timer.common.result.Result;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -20,9 +21,10 @@ import java.util.stream.Collectors;
  * @author pindou
  * @since 1.0.0
  */
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * 业务异常

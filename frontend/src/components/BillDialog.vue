@@ -82,11 +82,11 @@
 
         <div class="amount-row">
           <span class="label">正常费用</span>
-          <span class="value">¥{{ formatMoney(bill.amountDetail?.normalAmount) }}</span>
+          <span class="value">¥{{ formatMoney(bill.amountDetail?.normalAmount ?? 0) }}</span>
         </div>
-        <div class="amount-row" v-if="bill.amountDetail?.overtimeAmount > 0">
+        <div class="amount-row" v-if="(bill.amountDetail?.overtimeAmount ?? 0) > 0">
           <span class="label">超时费用</span>
-          <span class="value overtime">¥{{ formatMoney(bill.amountDetail?.overtimeAmount) }}</span>
+          <span class="value overtime">¥{{ formatMoney(bill.amountDetail?.overtimeAmount ?? 0) }}</span>
         </div>
 
         <!-- 支付方式信息 -->
@@ -95,7 +95,7 @@
           <div class="payment-method-info">
             <div class="payment-method-name">{{ getPaymentMethodLabel(bill.paymentMethod) }}</div>
             <!-- 组合支付明细 -->
-            <div v-if="bill.paymentMethod === 'combined' && (bill.balanceAmount >= 0 || bill.otherPaymentAmount >= 0)" class="payment-breakdown">
+            <div v-if="bill.paymentMethod === 'combined' && ((bill.balanceAmount ?? 0) >= 0 || (bill.otherPaymentAmount ?? 0) >= 0)" class="payment-breakdown">
               <div class="payment-breakdown-header">支付明细</div>
               <div v-if="bill.balanceAmount != null && bill.balanceAmount > 0" class="payment-breakdown-item balance">
                 <span class="breakdown-label">
@@ -127,7 +127,7 @@
 
         <div class="amount-row total">
           <span class="label">应付金额</span>
-          <span class="value total-amount">¥{{ formatMoney(bill.amountDetail?.totalAmount) }}</span>
+          <span class="value total-amount">¥{{ formatMoney(bill.amountDetail?.totalAmount ?? 0) }}</span>
         </div>
       </div>
 

@@ -779,7 +779,7 @@ defineExpose({
 })
 
 // 会员切换处理
-const handleMemberToggle = (value: boolean) => {
+const handleMemberToggle = (value: string | number | boolean) => {
   // 如果会员被锁定（桌台已有会员），不允许切换
   if (isMemberLocked.value) {
     // 恢复为会员状态

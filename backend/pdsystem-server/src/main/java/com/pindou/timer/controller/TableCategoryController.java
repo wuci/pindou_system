@@ -7,7 +7,8 @@ import com.pindou.timer.service.TableCategoryService;
 import com.pindou.timer.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -19,11 +20,12 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-29
  */
-@Slf4j
 @RestController
-@RequestMapping("/table-category")
+@RequestMapping("/api/table-category")
 @Tag(name = "桌台分类", description = "桌台分类管理接口")
-public class TableCategoryController {
+public class TableCategoryController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(TableCategoryController.class);
 
     @Resource
     private TableCategoryService categoryService;

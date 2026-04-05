@@ -18,8 +18,7 @@
         />
       </el-form-item>
       <el-form-item label="所属分类" prop="categoryId">
-        <el-select v-model="form.categoryId" placeholder="请选择分类" style="width: 100%">
-          <el-option label="未分类" :value="null" />
+        <el-select v-model="form.categoryId" placeholder="请选择分类" style="width: 100%" clearable>
           <el-option
             v-for="category in categories.filter(c => c.id !== 0)"
             :key="category.id"
@@ -40,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { updateTable } from '@/api/table'
 import type { TableInfo } from '@/api/table'
@@ -105,7 +104,7 @@ const handleSubmit = async () => {
 
     await updateTable(form.value.id, {
       name: form.value.name,
-      categoryId: form.value.categoryId
+      categoryId: form.value.categoryId ?? undefined
     })
 
     ElMessage.success('更新成功')

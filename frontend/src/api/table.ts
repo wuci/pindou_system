@@ -1,5 +1,4 @@
 import { http } from '@/utils/request'
-import type { PageResult } from '@/types'
 
 /**
  * 支付方式枚举
@@ -55,6 +54,8 @@ export interface TableInfo {
   startTime: number | null
   duration: number
   pauseDuration: number
+  pauseAccumulated?: number  // 累计暂停时长（秒）
+  lastPauseTime?: number | null  // 最后一次暂停时间（毫秒时间戳）
   presetDuration: number | null
   amount: number
   originalAmount?: number  // 原价（折扣前）
@@ -230,6 +231,7 @@ export interface ExtendTableParams {
   additionalDuration: number  // 额外时长（秒）
   channel?: string  // 订餐渠道
   memberId?: number  // 会员ID
+  paymentMethod?: PaymentMethod  // 支付方式
 }
 
 /**

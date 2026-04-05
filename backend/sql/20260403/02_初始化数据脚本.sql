@@ -110,8 +110,8 @@ INSERT INTO `sys_user` (id, username, password, nickname, role_id, status, last_
 -- 5. 桌台分类表 (biz_table_category)
 -- =============================================
 INSERT INTO `biz_table_category` (id, name, icon, sort_order, remark, created_at, updated_at) VALUES
-(1, '大厅', 'grid', 1, '大厅区域桌台', 1774596555000, 1774596555000),
-(2, '包间', 'office-building', 2, '包间桌台', 1774596555000, 1774596555000);
+(1, '大厅', 'grid', 1, '大厅区域桌台', FROM_UNIXTIME(1774596555000 / 1000), FROM_UNIXTIME(1774596555000 / 1000)),
+(2, '包间', 'office-building', 2, '包间桌台', FROM_UNIXTIME(1774596555000 / 1000), FROM_UNIXTIME(1774596555000 / 1000));
 
 -- =============================================
 -- 6. 会员等级配置表 (biz_member_level)

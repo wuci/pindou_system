@@ -8,7 +8,8 @@ import com.pindou.timer.service.UserService;
 import com.pindou.timer.util.IpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,11 +21,12 @@ import javax.servlet.http.HttpServletRequest;
  * @author pindou
  * @since 1.0.0
  */
-@Slf4j
 @Tag(name = "认证接口", description = "用户登录、登出、Token验证")
 @RestController
-@RequestMapping("/auth")
-public class AuthController {
+@RequestMapping("/api/auth")
+public class AuthController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final UserService userService;
 

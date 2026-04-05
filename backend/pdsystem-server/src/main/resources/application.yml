@@ -1,7 +1,6 @@
 server:
   port: 9026
   servlet:
-    context-path: /api
     encoding:
       charset: UTF-8
       enabled: true
@@ -43,16 +42,22 @@ spring:
         login-username: admin
         login-password: admin
 
-  # Redis配置
+  # Redis集群配置
   redis:
-    host: ${REDIS_HOST:localhost}
-    port: ${REDIS_PORT:6379}
+    cluster:
+      nodes:
+        - 8.130.49.28:7000
+        - 8.130.49.28:7001
+        - 8.130.49.28:7002
+        - 8.130.49.28:7003
+        - 8.130.49.28:7004
+        - 8.130.49.28:7005
+      max-redirects: 3
     password: ${REDIS_PASSWORD:}
-    database: 0
     lettuce:
       pool:
         max-active: 20
-        max-wait: -1
+        max-wait: -1ms
         max-idle: 10
         min-idle: 5
       shutdown-timeout: 100ms

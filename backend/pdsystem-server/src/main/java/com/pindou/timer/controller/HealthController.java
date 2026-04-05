@@ -3,7 +3,8 @@ package com.pindou.timer.controller;
 import com.pindou.timer.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,11 +20,12 @@ import java.sql.Connection;
  * @author pindou
  * @since 1.0.0
  */
-@Slf4j
 @Tag(name = "系统健康检查", description = "检查数据库、Redis等连接状态")
 @RestController
 @RequestMapping("/health")
 public class HealthController {
+
+    private static final Logger log = LoggerFactory.getLogger(HealthController.class);
 
     @Autowired
     private DataSource dataSource;

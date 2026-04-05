@@ -73,17 +73,17 @@
             <span class="label">原价</span>
             <span class="value original">¥{{ formatMoney(detail.originalAmount) }}</span>
           </div>
-          <div v-if="detail.discountAmount > 0" class="amount-item">
+          <div v-if="(detail.discountAmount ?? 0) > 0" class="amount-item">
             <span class="label">会员优惠</span>
-            <span class="value discount">-¥{{ formatMoney(detail.discountAmount) }}</span>
+            <span class="value discount">-¥{{ formatMoney(detail.discountAmount ?? 0) }}</span>
           </div>
           <div class="amount-item">
             <span class="label">正常费用</span>
             <span class="value">¥{{ formatMoney(detail.normalAmount) }}</span>
           </div>
-          <div v-if="detail.overtimeAmount > 0" class="amount-item">
+          <div v-if="(detail.overtimeAmount ?? 0) > 0" class="amount-item">
             <span class="label">超时费用</span>
-            <span class="value overtime">¥{{ formatMoney(detail.overtimeAmount) }}</span>
+            <span class="value overtime">¥{{ formatMoney(detail.overtimeAmount ?? 0) }}</span>
           </div>
           <div class="amount-item total">
             <span class="label">实付金额</span>
@@ -102,13 +102,13 @@
               {{ getPaymentMethodLabel(detail.paymentMethod) }}
             </el-tag>
           </div>
-          <div v-if="detail.balanceAmount > 0" class="info-item">
+          <div v-if="(detail.balanceAmount ?? 0) > 0" class="info-item">
             <span class="label">余额支付</span>
-            <span class="value balance">¥{{ formatMoney(detail.balanceAmount) }}</span>
+            <span class="value balance">¥{{ formatMoney(detail.balanceAmount ?? 0) }}</span>
           </div>
-          <div v-if="detail.otherPaymentAmount > 0" class="info-item">
+          <div v-if="(detail.otherPaymentAmount ?? 0) > 0" class="info-item">
             <span class="label">线下支付</span>
-            <span class="value offline">¥{{ formatMoney(detail.otherPaymentAmount) }}</span>
+            <span class="value offline">¥{{ formatMoney(detail.otherPaymentAmount ?? 0) }}</span>
           </div>
           <div v-if="detail.paidAt" class="info-item">
             <span class="label">支付时间</span>
@@ -272,14 +272,14 @@ const getPaymentMethodLabel = (method: string) => {
 }
 
 // 获取支付方式标签类型
-const getPaymentMethodTagType = (method: string) => {
-  const types: Record<string, string> = {
-    offline: '',
+const getPaymentMethodTagType = (method: string): 'success' | 'primary' | 'info' | 'warning' | 'danger' | undefined => {
+  const types: Record<string, 'success' | 'primary' | 'info' | 'warning' | 'danger' | undefined> = {
+    offline: undefined,
     online: 'primary',
     balance: 'success',
     combined: 'warning'
   }
-  return types[method] || ''
+  return types[method] ?? undefined
 }
 </script>
 

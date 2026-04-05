@@ -7,7 +7,8 @@ import com.pindou.timer.dto.SystemConfigRequest;
 import com.pindou.timer.service.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,11 +21,12 @@ import java.util.Map;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Tag(name = "配置接口", description = "系统配置相关接口")
 @RestController
-@RequestMapping("/config")
-public class ConfigController {
+@RequestMapping("/api/config")
+public class ConfigController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(ConfigController.class);
 
     @Resource
     private ConfigService configService;

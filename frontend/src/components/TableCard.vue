@@ -155,7 +155,7 @@
         </div>
 
         <!-- 时间信息（开始时间、到点时间） -->
-        <div v-if="table.status !== 'idle'" class="table-card__times">
+        <div v-if="table.status === 'using' || table.status === 'paused'" class="table-card__times">
           <div v-if="table.startTime" class="table-card__time-item" :title="formatFullDateTime(table.startTime)">
             <span class="table-card__time-label">开始</span>
             <span class="table-card__time-value">{{ formattedStartTime }}</span>
@@ -250,7 +250,7 @@ const props = withDefaults(defineProps<Props>(), {
   systemExtendTime: 30  // 默认30分钟
 })
 
-const emit = defineEmits<{
+defineEmits<{
   click: [table: TableInfo]
   start: [table: TableInfo]
   pause: [table: TableInfo]
@@ -265,7 +265,7 @@ const emit = defineEmits<{
 
 // 状态类型
 const statusType = computed(() => {
-  const statusMap = {
+  const statusMap: Record<string, 'success' | 'primary' | 'info' | 'warning' | 'danger' | undefined> = {
     idle: 'success',
     using: 'primary',
     paused: 'warning'
@@ -301,11 +301,6 @@ const formattedDuration = computed(() => {
 // 格式化暂停时长
 const formattedPauseDuration = computed(() => {
   return formatDuration(props.table.pauseDuration || 0)
-})
-
-// 格式化的金额显示
-const formattedAmount = computed(() => {
-  return `¥${(props.table.amount || 0).toFixed(2)}`
 })
 
 // 格式化预设时长
@@ -471,11 +466,6 @@ const formatFullDateTime = (timestamp: number): string => {
 const formattedReservationEndTime = computed(() => {
   if (!props.table.reservationEndTime) return ''
   return formatDateTime(props.table.reservationEndTime)
-})
-
-// 判断是否已预定
-const isReserved = computed(() => {
-  return props.table.reservationStatus === 'reserved'
 })
 </script>
 

@@ -14,7 +14,8 @@ import com.pindou.timer.service.TableService;
 import com.pindou.timer.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,11 +27,12 @@ import java.util.List;
  * @author pindou
  * @since 1.0.0
  */
-@Slf4j
 @Tag(name = "桌台接口", description = "桌台管理相关接口")
 @RestController
-@RequestMapping("/tables")
-public class TableController {
+@RequestMapping("/api/tables")
+public class TableController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(TableController.class);
 
     private final TableService tableService;
     private final UserService userService;

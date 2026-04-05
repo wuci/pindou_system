@@ -15,7 +15,6 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: () => import('@/layouts/DefaultLayout.vue'),
-    redirect: '/dashboard',
     meta: {
       requiresAuth: true
     },
@@ -125,7 +124,10 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    redirect: '/dashboard'
+    component: () => import('@/views/NotFound/index.vue'),
+    meta: {
+      title: '页面不存在'
+    }
   }
 ]
 
@@ -165,11 +167,56 @@ const checkModulePermission = (permissions: string[], permission: string): boole
 }
 
 /**
+ * 获取用户有权访问的第一个路由路径
+ * @param permissions 用户权限列表
+ * @returns 有权访问的路由路径，如果没有则返回空字符串
+ */
+const getFirstAccessibleRoute = (permissions: string[]): string => {
+  // 超级管理员直接返回工作台
+  if (permissions.includes('*')) {
+    return '/dashboard'
+  }
+
+  // 定义路由优先级顺序
+  const routeOrder: Array<{ path: string; permission: string }> = [
+    { path: '/dashboard', permission: 'dashboard:view' },
+    { path: '/tables', permission: 'table:view' },
+    { path: '/orders', permission: 'order:view' },
+    { path: '/reports', permission: 'statistics:view' },
+    { path: '/users', permission: 'user:view' },
+    { path: '/roles', permission: 'role:view' },
+    { path: '/logs', permission: 'log:view' },
+    { path: '/members', permission: 'member:view' },
+    { path: '/member-levels', permission: 'member:level' },
+    { path: '/settings', permission: 'system:view' }
+  ]
+
+  // 按优先级查找第一个有权访问的路由
+  for (const route of routeOrder) {
+    if (checkModulePermission(permissions, route.permission)) {
+      return route.path
+    }
+  }
+
+  return ''
+}
+
+// 防止无限跳转的标志
+let isRedirecting = false
+
+/**
  * 路由守卫
  */
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   try {
     console.log('路由守卫:', to.path, 'from:', from.path, 'isLogin:', useUserStore().isLogin)
+
+    // 如果正在重定向，直接放行，避免无限循环
+    if (isRedirecting) {
+      console.log('正在重定向中，跳过本次守卫检查')
+      next()
+      return
+    }
 
     const userStore = useUserStore()
 
@@ -179,32 +226,76 @@ router.beforeEach((to, from, next) => {
       ? `${to.meta.title} - ${appTitle}`
       : appTitle
 
-    // 如果已经是登录页，直接放行
+    // 1. 登录页处理 - 直接放行
     if (to.path === '/login') {
       next()
       return
     }
 
-    // 检查是否需要登录
-    if (to.meta.requiresAuth !== false) {
-      if (!userStore.isLogin) {
-        console.log('未登录，重定向到登录页')
-        // 未登录跳转登录页
-        next({
-          path: '/login',
-          query: { redirect: to.fullPath }
-        })
+    // 2. 未登录处理 - 直接跳转登录页
+    if (to.meta.requiresAuth !== false && !userStore.isLogin) {
+      console.log('未登录，重定向到登录页')
+      isRedirecting = true
+      next({ path: '/login', query: { redirect: to.fullPath } })
+      setTimeout(() => { isRedirecting = false }, 100)
+      return
+    }
+
+    // 3. 已登录但权限为空 - 视为数据不完整，清除登录状态
+    if (to.meta.requiresAuth !== false && userStore.isLogin && (!userStore.permissions || userStore.permissions.length === 0)) {
+      console.log('权限为空，清除登录状态')
+      userStore.clearAuth()
+      isRedirecting = true
+      next({ path: '/login' })
+      setTimeout(() => { isRedirecting = false }, 100)
+      return
+    }
+
+    // 4. 根路径重定向处理
+    if (to.path === '/') {
+      if (userStore.isLogin) {
+        const firstRoute = getFirstAccessibleRoute(userStore.permissions)
+        if (firstRoute) {
+          isRedirecting = true
+          next({ path: firstRoute, replace: true })
+          setTimeout(() => { isRedirecting = false }, 100)
+          return
+        } else {
+          // 没有任何权限，清除登录状态
+          userStore.clearAuth()
+          isRedirecting = true
+          next({ path: '/login' })
+          setTimeout(() => { isRedirecting = false }, 100)
+          return
+        }
+      } else {
+        isRedirecting = true
+        next({ path: '/login' })
+        setTimeout(() => { isRedirecting = false }, 100)
         return
       }
+    }
 
-      // 检查权限（只有已登录用户才检查权限）
-      if (to.meta.permission) {
-        const requiredPermission = to.meta.permission as string
-        if (!checkModulePermission(userStore.permissions, requiredPermission)) {
-          console.log('无权限，重定向到首页。需要权限:', requiredPermission, '用户权限:', userStore.permissions)
-          // 已登录用户无权限时，提示并跳转到首页
+    // 5. 检查路由权限
+    if (to.meta.requiresAuth !== false && to.meta.permission) {
+      const requiredPermission = to.meta.permission as string
+      if (!checkModulePermission(userStore.permissions, requiredPermission)) {
+        console.log('无权限，查找可访问页面。需要权限:', requiredPermission, '用户权限:', userStore.permissions)
+        // 无权限时，查找第一个有权访问的页面
+        const firstRoute = getFirstAccessibleRoute(userStore.permissions)
+        if (firstRoute) {
           ElMessage.warning('您没有访问该页面的权限')
-          next({ path: '/dashboard' })
+          isRedirecting = true
+          next({ path: firstRoute })
+          setTimeout(() => { isRedirecting = false }, 100)
+          return
+        } else {
+          // 没有任何权限，清除登录状态
+          ElMessage.warning('您的账号没有任何访问权限，请联系管理员')
+          userStore.clearAuth()
+          isRedirecting = true
+          next({ path: '/login' })
+          setTimeout(() => { isRedirecting = false }, 100)
           return
         }
       }
@@ -215,7 +306,9 @@ router.beforeEach((to, from, next) => {
   } catch (error) {
     console.error('路由守卫错误:', error)
     // 发生错误时跳转到登录页
+    isRedirecting = true
     next({ path: '/login' })
+    setTimeout(() => { isRedirecting = false }, 100)
   }
 })
 

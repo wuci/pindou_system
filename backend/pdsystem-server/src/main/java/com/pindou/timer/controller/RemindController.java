@@ -5,7 +5,8 @@ import com.pindou.timer.dto.RemindInfo;
 import com.pindou.timer.service.RemindService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -17,11 +18,12 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Tag(name = "提醒接口", description = "提醒系统相关接口")
 @RestController
-@RequestMapping("/remind")
-public class RemindController {
+@RequestMapping("/api/remind")
+public class RemindController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(RemindController.class);
 
     @Resource
     private RemindService remindService;

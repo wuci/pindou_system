@@ -7,7 +7,8 @@ import com.pindou.timer.dto.LogQueryRequest;
 import com.pindou.timer.service.LogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -19,11 +20,12 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Tag(name = "日志接口", description = "操作日志相关接口")
 @RestController
-@RequestMapping("/logs")
-public class LogController {
+@RequestMapping("/api/logs")
+public class LogController extends ETSBaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(LogController.class);
 
     @Resource
     private LogService logService;

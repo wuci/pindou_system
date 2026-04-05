@@ -36,13 +36,32 @@ public class SecurityConfig {
             // 配置请求授权
             .authorizeRequests()
 
+            // 放行前端静态资源
+            .antMatchers(
+                "/",
+                "/index.html",
+                "/assets/**",
+                "/static/**",
+                "/favicon.ico",
+                "/login",
+                "/dashboard/**",
+                "/tables/**",
+                "/orders/**",
+                "/reports/**",
+                "/users/**",
+                "/roles/**",
+                "/logs/**",
+                "/members/**",
+                "/member-levels/**",
+                "/settings/**"
+            ).permitAll()
+
             // 放行Knife4j接口文档相关路径
             .antMatchers(
                 "/doc.html",
                 "/webjars/**",
                 "/swagger-resources/**",
                 "/v3/api-docs/**",
-                "/favicon.ico",
                 "/**/api-docs",
                 "/**/api-docs/**"
             ).permitAll()
@@ -50,8 +69,8 @@ public class SecurityConfig {
             // 放行Druid监控相关路径
             .antMatchers("/druid/**").permitAll()
 
-            // 放行公共接口（登录接口等）
-            .antMatchers("/auth/**").permitAll()
+            // 放行公共接口（登录接口等）- 注意现在有 /api 前缀
+            .antMatchers("/api/auth/**").permitAll()
 
             // 放行健康检查接口
             .antMatchers("/health/**").permitAll()

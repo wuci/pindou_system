@@ -1,5 +1,4 @@
 import { http } from '@/utils/request'
-import type { PageResult, PageParams } from '@/types'
 
 /**
  * 今日统计数据

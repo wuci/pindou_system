@@ -610,14 +610,14 @@ const getPaymentMethodLabel = (method: string) => {
 /**
  * 获取支付方式标签类型
  */
-const getPaymentMethodTagType = (method: string) => {
-  const types: Record<string, string> = {
-    offline: '',
+const getPaymentMethodTagType = (method: string): 'primary' | 'success' | 'warning' | 'danger' | 'info' | undefined => {
+  const types: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'info' | undefined> = {
+    offline: undefined,
     online: 'primary',
     balance: 'success',
     combined: 'warning'
   }
-  return types[method] || ''
+  return types[method] || undefined
 }
 
 /**

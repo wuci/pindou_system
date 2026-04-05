@@ -63,5 +63,6 @@ com\pindou\timer\entity\OperationLog.class
 com\pindou\timer\entity\User.class
 com\pindou\timer\dto\TimeLineItem.class
 com\pindou\timer\dto\OrderQueryRequest.class
+com\pindou\timer\dto\ResetPasswordRequest.class
 com\pindou\timer\entity\Permission.class
 com\pindou\timer\dto\AmountDetail.class

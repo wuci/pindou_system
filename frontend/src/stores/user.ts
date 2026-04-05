@@ -146,14 +146,20 @@ export const useUserStore = defineStore('user', {
         return
       }
 
-      try {
-        // 调用获取用户信息接口
-        const userInfo = await getUserInfo()
-        this.setUserInfo(userInfo)
-      } catch (error) {
-        // 获取失败，清除登录状态
-        this.logout()
-      }
+      // 调用获取用户信息接口
+      const userInfo = await getUserInfo()
+      this.setUserInfo(userInfo)
+    },
+
+    /**
+     * 清除认证信息（不调用后端接口）
+     */
+    clearAuth() {
+      this.token = null
+      this.userInfo = null
+      this.permissions = []
+      storage.remove('token')
+      storage.remove('userInfo')
     }
   }
 })

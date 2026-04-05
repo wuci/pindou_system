@@ -820,7 +820,7 @@ const handleConfirm = async () => {
 }
 
 // 会员切换处理
-const handleMemberToggle = (value: boolean) => {
+const handleMemberToggle = (value: string | number | boolean) => {
   if (!value) {
     selectedMember.value = null
   } else {

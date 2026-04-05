@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useUserStore } from './user'
 import {
-  getWebSocket,
   initWebSocket,
   WebSocketManager,
   WebSocketStatus,

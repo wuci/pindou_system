@@ -9,8 +9,9 @@ import com.pindou.timer.entity.User;
 import com.pindou.timer.mapper.RoleMapper;
 import com.pindou.timer.mapper.UserMapper;
 import com.pindou.timer.util.JwtUtil;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -28,9 +29,10 @@ import java.util.List;
  * @author wuci
  * @date 2026-03-28
  */
-@Slf4j
 @Component
 public class PermissionInterceptor implements HandlerInterceptor {
+
+    private static final Logger log = LoggerFactory.getLogger(PermissionInterceptor.class);
 
     private static final String TOKEN_HEADER = "Authorization";
     private static final String TOKEN_PREFIX = "Bearer ";

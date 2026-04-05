@@ -488,7 +488,7 @@ const formatRuleDisplay = (rule: BillingRuleItem): string => {
 }
 
 // 处理不限时变化
-const handleUnlimitedChange = (rule: BillingRuleItem, index: number) => {
+const handleUnlimitedChange = (rule: BillingRuleItem, _index: number) => {
   if (rule.unlimited) {
     rule.minutes = null
     rule.hours = 0
@@ -685,6 +685,7 @@ const remindFormRef = ref<FormInstance>()
 const remindSaving = ref(false)
 const remindForm = reactive<RemindConfig & { soundEnabledBoolean: boolean }>({
   threshold: 300,
+  soundEnabled: 1,
   soundEnabledBoolean: true,
   repeatInterval: 60,
   expiringCloseTime: 60,
@@ -740,6 +741,16 @@ const saveRemindConfig = async () => {
 const systemFormRef = ref<FormInstance>()
 const systemSaving = ref(false)
 const systemForm = reactive<SystemConfig>({
+  tableCount: 0,
+  billingRule: { channels: [] },
+  remindConfig: {
+    threshold: 300,
+    soundEnabled: 1,
+    repeatInterval: 60,
+    expiringCloseTime: 60,
+    timeoutCloseTime: 120
+  },
+  sessionTimeout: 0,
   extendTime: 30,
   invalidOrderTime: 0,
   maxExtendCount: 0,
