@@ -43,7 +43,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final RoleMapper roleMapper;
 
     private static final String TOKEN_PREFIX = "token:";
-    private static final long TOKEN_EXPIRE_TIME = 7 * 24 * 60 * 60; // 7天（秒）
+    /**
+     * Token过期时间（30分钟，单位：秒）
+     * 用户30分钟内无操作将自动退出登录
+     */
+    private static final long TOKEN_EXPIRE_TIME = 30 * 60;
 
     public UserServiceImpl(JwtUtil jwtUtil, RedisUtil redisUtil, RoleMapper roleMapper) {
         this.jwtUtil = jwtUtil;
@@ -180,7 +184,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 String cachedToken = (String) redisUtil.get(tokenKey);
                 boolean isValid = token.equals(cachedToken);
 
-                if (!isValid) {
+                if (isValid) {
+                    // 滑动过期：每次验证成功后刷新过期时间
+                    redisUtil.set(tokenKey, token, TOKEN_EXPIRE_TIME, TimeUnit.SECONDS);
+                    log.debug("Token验证成功，已刷新过期时间: userId={}", userId);
+                } else {
                     log.warn("Redis中的Token不匹配: userId={}", userId);
                 }
 
