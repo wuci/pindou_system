@@ -205,7 +205,6 @@ const loadLogs = async () => {
     total.value = result.total
   } catch (error) {
     ElMessage.error('加载日志列表失败')
-    console.error(error)
   } finally {
     loading.value = false
   }
@@ -280,7 +279,6 @@ const handleExport = async () => {
     ElMessage.success('导出成功')
   } catch (error) {
     ElMessage.error('导出失败')
-    console.error(error)
   }
 }
 

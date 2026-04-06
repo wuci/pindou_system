@@ -70,7 +70,6 @@ const loadPermissionTree = async () => {
     permissionTree.value = tree
   } catch (error) {
     ElMessage.error('加载权限配置失败')
-    console.error(error)
   } finally {
     loading.value = false
   }

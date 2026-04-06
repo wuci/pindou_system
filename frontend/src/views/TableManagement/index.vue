@@ -207,7 +207,6 @@ const loadCategories = async () => {
     const data = await getCategories()
     categories.value = data
   } catch (error) {
-    console.error('加载分类失败', error)
   }
 }
 
@@ -218,7 +217,6 @@ const loadTables = async () => {
     const data = await getTableList('', currentCategory.value, searchKeyword.value)
     tables.value = data
   } catch (error) {
-    console.error('加载桌台失败', error)
   } finally {
     loading.value = false
   }

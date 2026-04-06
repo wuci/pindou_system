@@ -152,7 +152,6 @@ const loadReminders = async () => {
     // 通知父组件
     emit('remind', remindList.value)
   } catch (error) {
-    console.error('加载提醒失败', error)
   }
 }
 
@@ -251,7 +250,6 @@ const playSound = () => {
     oscillator.start(audioContext.currentTime)
     oscillator.stop(audioContext.currentTime + 0.3)
   } catch (e) {
-    console.warn('播放提示音失败', e)
   }
 }
 
@@ -286,7 +284,6 @@ const initWebSocket = () => {
   if (webSocketStore.isInitialized && webSocketStore.isConnected) {
     unsubscribeRemind = webSocketStore.onRemind(handleWebSocketRemind)
     useWebSocket.value = true
-    console.log('[RemindPanel] 已订阅 WebSocket 提醒消息')
   }
 }
 

@@ -3,24 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
-
-onMounted(() => {
-  console.log('=== 拼豆店计时管理系统启动 ===')
-  console.log('当前环境:', import.meta.env.MODE)
-  console.log('API地址:', import.meta.env.VITE_APP_BASE_API)
-  console.log('应用标题:', import.meta.env.VITE_APP_TITLE)
-  console.log('当前路由:', window.location.pathname)
-})
-
-// 添加全局错误处理
-window.addEventListener('error', (event) => {
-  console.error('全局错误:', event.error)
-})
-
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('未处理的Promise拒绝:', event.reason)
-})
+// 豆屿温柔集管理系统入口
 </script>
 
 <style>

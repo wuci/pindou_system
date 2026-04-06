@@ -201,16 +201,8 @@ const loadBill = async () => {
   loading.value = true
   try {
     bill.value = await getTableBill(props.tableId)
-    console.log('=== 账单数据 ===')
-    console.log('支付方式:', bill.value.paymentMethod)
-    console.log('余额支付金额:', bill.value.balanceAmount)
-    console.log('其他支付金额:', bill.value.otherPaymentAmount)
-    console.log('总金额:', bill.value.amountDetail?.totalAmount)
-    console.log('完整账单:', bill.value)
-    console.log('===============')
   } catch (error) {
     ElMessage.error('获取账单失败')
-    console.error(error)
   } finally {
     loading.value = false
   }
@@ -240,7 +232,6 @@ const handleConfirm = async () => {
     emit('update:modelValue', false)
   } catch (error) {
     ElMessage.error('结账失败')
-    console.error(error)
   } finally {
     confirming.value = false
   }

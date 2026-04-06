@@ -17,7 +17,7 @@
     <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>pindou-timer</name>
-    <description>拼豆店计时管理系统</description>
+    <description>豆屿温柔集管理系统</description>
 
     <modules>
         <module>pdsystem-dto</module>

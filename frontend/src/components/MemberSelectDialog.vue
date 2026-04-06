@@ -134,7 +134,6 @@ const loadMembers = async () => {
     total.value = result.total
   } catch (error) {
     ElMessage.error('加载会员列表失败')
-    console.error(error)
   } finally {
     loading.value = false
   }

@@ -6,6 +6,9 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import { setupDirectives } from './directives'
 
+// 引入全局样式
+import '@/assets/styles/index.scss'
+
 const app = createApp(App)
 const pinia = createPinia()
 

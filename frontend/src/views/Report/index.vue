@@ -6,7 +6,15 @@
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-icon revenue">
-              <el-icon><Money /></el-icon>
+              <!-- 温柔营收图标 -->
+              <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="24" cy="32" rx="16" ry="10" fill="rgba(255,255,255,0.3)" transform="rotate(-10, 24, 32)"/>
+                <circle cx="20" cy="30" r="2.5" fill="#fff" opacity="0.9"/>
+                <circle cx="28" cy="34" r="3" fill="#fff" opacity="0.95"/>
+                <circle cx="24" cy="26" r="2" fill="#fff" opacity="0.85"/>
+                <line x1="20" y1="30" x2="28" y2="34" stroke="#fff" stroke-width="1" opacity="0.3"/>
+                <line x1="20" y1="30" x2="24" y2="26" stroke="#fff" stroke-width="1" opacity="0.25"/>
+              </svg>
             </div>
             <div class="stat-info">
               <div class="stat-label">今日营收</div>
@@ -19,7 +27,18 @@
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-icon orders">
-              <el-icon><Document /></el-icon>
+              <!-- 温柔订单图标 -->
+              <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="32" r="12" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/>
+                <circle cx="18" cy="28" r="2.5" fill="#fff" opacity="0.9"/>
+                <circle cx="30" cy="30" r="3" fill="#fff" opacity="0.95"/>
+                <circle cx="24" cy="36" r="2" fill="#fff" opacity="0.85"/>
+                <circle cx="32" cy="26" r="1.8" fill="#fff" opacity="0.88"/>
+                <circle cx="20" cy="34" r="1.5" fill="#fff" opacity="0.82"/>
+                <line x1="18" y1="28" x2="30" y2="30" stroke="#fff" stroke-width="0.6" opacity="0.3"/>
+                <line x1="18" y1="28" x2="24" y2="36" stroke="#fff" stroke-width="0.6" opacity="0.25"/>
+                <line x1="30" y1="30" x2="32" y2="26" stroke="#fff" stroke-width="0.6" opacity="0.25"/>
+              </svg>
             </div>
             <div class="stat-info">
               <div class="stat-label">今日订单</div>
@@ -32,7 +51,15 @@
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-icon tables">
-              <el-icon><OfficeBuilding /></el-icon>
+              <!-- 温柔桌台图标 -->
+              <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="16" cy="34" rx="10" ry="7" fill="rgba(255,255,255,0.4)" transform="rotate(-8, 16, 34)"/>
+                <ellipse cx="32" cy="34" rx="10" ry="7" fill="rgba(255,255,255,0.5)" transform="rotate(8, 32, 34)"/>
+                <circle cx="16" cy="32" r="2" fill="#fff" opacity="0.9"/>
+                <circle cx="32" cy="32" r="2.5" fill="#fff" opacity="0.95"/>
+                <circle cx="24" cy="28" r="1.5" fill="#fff" opacity="0.85"/>
+                <path d="M22 40 Q26 38 30 40" stroke="#fff" stroke-width="1" opacity="0.3" fill="none"/>
+              </svg>
             </div>
             <div class="stat-info">
               <div class="stat-label">使用中桌台</div>
@@ -45,7 +72,24 @@
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
             <div class="stat-icon turnover">
-              <el-icon><TrendCharts /></el-icon>
+              <!-- 温柔翻台率图标 -->
+              <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="32" r="10" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
+                <circle cx="24" cy="32" r="5" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+                <!-- 流动的光点 -->
+                <circle cx="24" cy="22" r="2" fill="#fff" opacity="0.95">
+                  <animate attributeName="cy" values="22;42;22" dur="3s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="14" cy="36" r="1.5" fill="#fff" opacity="0.85">
+                  <animate attributeName="cx" values="14;34;14" dur="4s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.85;0.3;0.85" dur="4s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="34" cy="36" r="1.5" fill="#fff" opacity="0.85">
+                  <animate attributeName="cx" values="34;14;34" dur="4s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.85;0.3;0.85" dur="4s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="24" cy="32" r="2.5" fill="#fff" opacity="0.98"/>
+              </svg>
             </div>
             <div class="stat-info">
               <div class="stat-label">翻台率</div>
@@ -101,7 +145,6 @@ const loadDailyStats = async () => {
     dailyStats.value = data
   } catch (error) {
     ElMessage.error('加载统计数据失败')
-    console.error(error)
   }
 }
 
@@ -113,7 +156,6 @@ const loadRevenueTrend = async () => {
     renderChart()
   } catch (error) {
     ElMessage.error('加载营收趋势失败')
-    console.error(error)
   }
 }
 
@@ -252,6 +294,12 @@ onUnmounted(() => {
 
 .stat-card {
   margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(212, 165, 255, 0.2);
 }
 
 .stat-content {
@@ -275,19 +323,23 @@ onUnmounted(() => {
 }
 
 .stat-icon.revenue {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #ffb6d9 0%, #d4a5ff 100%);
+  box-shadow: 0 4px 12px rgba(212, 165, 255, 0.3);
 }
 
 .stat-icon.orders {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(135deg, #c5e3ff 0%, #9ac0ff 100%);
+  box-shadow: 0 4px 12px rgba(154, 192, 255, 0.3);
 }
 
 .stat-icon.tables {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(135deg, #98d4bb 0%, #7dd3b0 100%);
+  box-shadow: 0 4px 12px rgba(152, 216, 187, 0.3);
 }
 
 .stat-icon.turnover {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  background: linear-gradient(135deg, #ffd993 0%, #ffb86c 100%);
+  box-shadow: 0 4px 12px rgba(255, 217, 147, 0.3);
 }
 
 .stat-info {
@@ -303,7 +355,10 @@ onUnmounted(() => {
 .stat-value {
   font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  background: linear-gradient(135deg, #d4a5ff 0%, #ffb6d9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .chart-card {

@@ -833,7 +833,6 @@ const loadBillingConfig = async () => {
       setDefaultRules()
     }
   } catch (error) {
-    console.error('加载计费规则配置失败', error)
     setDefaultRules()
   }
 }
@@ -928,7 +927,6 @@ const loadRemindConfig = async () => {
     remindForm.soundEnabledBoolean = config.soundEnabled === 1
     remindForm.repeatInterval = config.repeatInterval || 60
   } catch (error) {
-    console.error('加载提醒配置失败', error)
   }
 }
 
@@ -992,7 +990,6 @@ const loadSystemConfig = async () => {
     systemForm.extendTime = config.extendTime || 30
     systemForm.invalidOrderTime = config.invalidOrderTime ?? 0
   } catch (error) {
-    console.error('加载系统参数配置失败', error)
   }
 }
 
@@ -1073,7 +1070,6 @@ const loadDiscountList = async () => {
     const result = await getDiscountList({ page: 1, pageSize: 100 })
     discountList.value = result.list
   } catch (error) {
-    console.error('加载折扣列表失败', error)
   }
 }
 
@@ -1082,7 +1078,6 @@ const loadMemberLevels = async () => {
   try {
     memberLevels.value = await getMemberLevelList()
   } catch (error) {
-    console.error('加载会员等级失败', error)
   }
 }
 

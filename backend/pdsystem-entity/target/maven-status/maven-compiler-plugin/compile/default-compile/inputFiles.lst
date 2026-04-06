@@ -46,8 +46,10 @@ E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRuleConfigRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\DailyStatsResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UserInfo.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\DesignStoreRules.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LoginRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\Table.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\constants\RuleTypeEnum.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\MemberInfo.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ChannelBillingRuleRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RechargeRecordResponse.java
@@ -73,5 +75,6 @@ E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\constants\TableConstants.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\common\result\Result.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RevenueTrendItem.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\constants\RuleCategoryEnum.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ReservationRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\StartTimerRequest.java

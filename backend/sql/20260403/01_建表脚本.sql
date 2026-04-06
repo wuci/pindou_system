@@ -1,5 +1,5 @@
 -- =============================================
--- 拼豆店计时管理系统 - 数据库建表脚本
+-- 豆屿温柔集管理系统 - 数据库建表脚本
 -- 版本: 1.0
 -- 数据库: MySQL 8.0+
 -- 日期: 2026-04-04
@@ -350,6 +350,29 @@ CREATE TABLE `biz_discount` (
   KEY `idx_member_level_id` (`member_level_id`),
   KEY `idx_sort` (`sort`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='折扣设置表';
+
+-- =============================================
+-- 15. 店铺规则表 (design_store_rules)
+-- =============================================
+DROP TABLE IF EXISTS `design_store_rules`;
+
+CREATE TABLE `design_store_rules` (
+  `id` VARCHAR(36) NOT NULL COMMENT '规则ID（UUID）',
+  `category` VARCHAR(50) NOT NULL COMMENT '规则分类：packages-套餐规则, services-增值服务, safety-安全须知, other-其他规定',
+  `title` VARCHAR(200) DEFAULT NULL COMMENT '规则标题',
+  `content` TEXT DEFAULT NULL COMMENT '规则内容（HTML格式，支持富文本）',
+  `rule_type` VARCHAR(50) DEFAULT NULL COMMENT '规则类型：table-表格数据, list-列表, warning-警告框, special-特色服务',
+  `sort_order` INT DEFAULT 0 COMMENT '排序号',
+  `is_enabled` TINYINT(1) DEFAULT 1 COMMENT '是否启用：0-禁用，1-启用',
+  `created_at` BIGINT NOT NULL COMMENT '创建时间（毫秒时间戳）',
+  `updated_at` BIGINT DEFAULT NULL COMMENT '更新时间（毫秒时间戳）',
+  `created_by` VARCHAR(36) DEFAULT NULL COMMENT '创建人ID',
+  `updated_by` VARCHAR(36) DEFAULT NULL COMMENT '更新人ID',
+  PRIMARY KEY (`id`),
+  KEY `idx_category` (`category`),
+  KEY `idx_enabled` (`is_enabled`),
+  KEY `idx_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='店铺规则表';
 
 -- =============================================
 -- 建表脚本执行完成

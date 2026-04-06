@@ -55,6 +55,7 @@ declare module 'vue' {
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElTree: typeof import('element-plus/es')['ElTree']
     ExtendDialog: typeof import('./components/ExtendDialog.vue')['default']
+    GentleIcon: typeof import('./components/GentleIcon.vue')['default']
     MemberSelectDialog: typeof import('./components/MemberSelectDialog.vue')['default']
     OrderDetailDrawer: typeof import('./components/OrderDetailDrawer.vue')['default']
     PermissionTree: typeof import('./components/PermissionTree.vue')['default']
@@ -64,6 +65,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StartTimerDialog: typeof import('./components/StartTimerDialog.vue')['default']
+    StoreRuleDialog: typeof import('./components/StoreRuleDialog.vue')['default']
     TableCard: typeof import('./components/TableCard.vue')['default']
     TableLayoutEditor: typeof import('./components/TableLayoutEditor.vue')['default']
   }

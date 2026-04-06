@@ -209,11 +209,8 @@ let isRedirecting = false
  */
 router.beforeEach(async (to, from, next) => {
   try {
-    console.log('路由守卫:', to.path, 'from:', from.path, 'isLogin:', useUserStore().isLogin)
-
     // 如果正在重定向，直接放行，避免无限循环
     if (isRedirecting) {
-      console.log('正在重定向中，跳过本次守卫检查')
       next()
       return
     }
@@ -234,7 +231,6 @@ router.beforeEach(async (to, from, next) => {
 
     // 2. 未登录处理 - 直接跳转登录页
     if (to.meta.requiresAuth !== false && !userStore.isLogin) {
-      console.log('未登录，重定向到登录页')
       isRedirecting = true
       next({ path: '/login', query: { redirect: to.fullPath } })
       setTimeout(() => { isRedirecting = false }, 100)
@@ -243,7 +239,6 @@ router.beforeEach(async (to, from, next) => {
 
     // 3. 已登录但权限为空 - 视为数据不完整，清除登录状态
     if (to.meta.requiresAuth !== false && userStore.isLogin && (!userStore.permissions || userStore.permissions.length === 0)) {
-      console.log('权限为空，清除登录状态')
       userStore.clearAuth()
       isRedirecting = true
       next({ path: '/login' })
@@ -280,7 +275,6 @@ router.beforeEach(async (to, from, next) => {
     if (to.meta.requiresAuth !== false && to.meta.permission) {
       const requiredPermission = to.meta.permission as string
       if (!checkModulePermission(userStore.permissions, requiredPermission)) {
-        console.log('无权限，查找可访问页面。需要权限:', requiredPermission, '用户权限:', userStore.permissions)
         // 无权限时，查找第一个有权访问的页面
         const firstRoute = getFirstAccessibleRoute(userStore.permissions)
         if (firstRoute) {
@@ -301,10 +295,8 @@ router.beforeEach(async (to, from, next) => {
       }
     }
 
-    console.log('路由守卫通过，继续导航')
     next()
   } catch (error) {
-    console.error('路由守卫错误:', error)
     // 发生错误时跳转到登录页
     isRedirecting = true
     next({ path: '/login' })

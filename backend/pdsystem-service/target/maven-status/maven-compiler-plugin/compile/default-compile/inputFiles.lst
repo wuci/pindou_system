@@ -3,6 +3,7 @@ E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\time
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\RechargeRecordMapper.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\DiscountServiceImpl.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\TableMapper.java
+E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\DesignStoreRulesMapper.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\StatisticsServiceImpl.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\RoleMapper.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\MemberLevelMapper.java
@@ -19,10 +20,12 @@ E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\time
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\PermissionMapper.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\OperationLogMapper.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\ConfigService.java
+E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\DesignStoreRulesService.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\MemberDiscountService.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\StatisticsService.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\MemberLevelService.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\MemberServiceImpl.java
+E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\DesignStoreRulesServiceImpl.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\service\impl\OrderSettlementServiceImpl.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\TableCategoryMapper.java
 E:\ai_project\pindouTimer\backend\pdsystem-service\src\main\java\com\pindou\timer\mapper\TableLayoutConfigMapper.java

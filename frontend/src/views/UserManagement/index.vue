@@ -348,7 +348,6 @@ const loadUsers = async () => {
     total.value = result.total
   } catch (error) {
     ElMessage.error('加载用户列表失败')
-    console.error(error)
   } finally {
     loading.value = false
   }
@@ -360,7 +359,6 @@ const loadRoles = async () => {
     const result = await getAllRoles()
     roleList.value = result
   } catch (error) {
-    console.error('加载角色列表失败', error)
   }
 }
 

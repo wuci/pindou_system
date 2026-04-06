@@ -31,6 +31,7 @@ com\pindou\timer\dto\DurationCalculation.class
 com\pindou\timer\dto\RoleQueryRequest.class
 com\pindou\timer\dto\DiscountQueryRequest.class
 com\pindou\timer\dto\RechargeRequest.class
+com\pindou\timer\constants\RuleCategoryEnum.class
 com\pindou\timer\dto\ConfigResponse.class
 com\pindou\timer\dto\OrderInfoResponse.class
 com\pindou\timer\dto\DailyStatsResponse.class
@@ -54,6 +55,7 @@ com\pindou\timer\dto\PermissionResponse.class
 com\pindou\timer\dto\UpdateMemberLevelRequest.class
 com\pindou\timer\dto\UserInfo.class
 com\pindou\timer\entity\ConsumptionRecord.class
+com\pindou\timer\entity\DesignStoreRules.class
 com\pindou\timer\entity\TableCategory.class
 com\pindou\timer\dto\LoginRequest.class
 com\pindou\timer\dto\UserQueryRequest.class
@@ -68,6 +70,7 @@ com\pindou\timer\entity\Discount.class
 com\pindou\timer\dto\CreateMemberLevelRequest.class
 com\pindou\timer\dto\OrderAmountCalculation$OrderAmountCalculationBuilder.class
 com\pindou\timer\common\result\PageResult.class
+com\pindou\timer\constants\RuleTypeEnum.class
 com\pindou\timer\dto\RevenueTrendRequest.class
 com\pindou\timer\dto\LoginResponse.class
 com\pindou\timer\entity\MemberLevel.class

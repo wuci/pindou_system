@@ -120,14 +120,12 @@ export class WebSocketManager {
    */
   connect(url?: string): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.warn('[WebSocket] 已连接，无需重复连接')
       return
     }
 
     // 构建WebSocket URL
     const wsUrl = url || this.options.url || this.buildWsUrl()
 
-    console.log('[WebSocket] 正在连接:', wsUrl)
     this.status = WebSocketStatus.CONNECTING
     this.manualClose = false
 
@@ -139,7 +137,6 @@ export class WebSocketManager {
       this.ws.onerror = this.handleError.bind(this)
       this.ws.onclose = this.handleClose.bind(this)
     } catch (error) {
-      console.error('[WebSocket] 连接失败:', error)
       this.status = WebSocketStatus.ERROR
       this.scheduleReconnect()
     }
@@ -159,7 +156,6 @@ export class WebSocketManager {
     }
 
     this.status = WebSocketStatus.DISCONNECTED
-    console.log('[WebSocket] 已断开连接')
   }
 
   /**
@@ -169,8 +165,6 @@ export class WebSocketManager {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const message = typeof data === 'string' ? data : JSON.stringify(data)
       this.ws.send(message)
-    } else {
-      console.warn('[WebSocket] 未连接，无法发送消息:', data)
     }
   }
 
@@ -220,7 +214,6 @@ export class WebSocketManager {
    * 处理连接打开
    */
   private handleOpen(): void {
-    console.log('[WebSocket] 连接成功')
     this.status = WebSocketStatus.CONNECTED
     this.reconnectAttempts = 0
     this.startHeartbeat()
@@ -238,8 +231,6 @@ export class WebSocketManager {
         return
       }
 
-      console.debug('[WebSocket] 收到消息:', message)
-
       // 触发特定类型的处理器
       if (message.type) {
         const handlers = this.messageHandlers.get(message.type)
@@ -248,7 +239,6 @@ export class WebSocketManager {
             try {
               handler(message)
             } catch (error) {
-              console.error('[WebSocket] 消息处理错误:', error)
             }
           })
         }
@@ -260,7 +250,6 @@ export class WebSocketManager {
         allHandlers.forEach(handler => handler(message))
       }
     } catch (error) {
-      console.error('[WebSocket] 消息解析错误:', error)
     }
   }
 
@@ -268,7 +257,6 @@ export class WebSocketManager {
    * 处理连接错误
    */
   private handleError(event: Event): void {
-    console.error('[WebSocket] 连接错误:', event)
     this.status = WebSocketStatus.ERROR
   }
 
@@ -276,7 +264,6 @@ export class WebSocketManager {
    * 处理连接关闭
    */
   private handleClose(event: CloseEvent): void {
-    console.log('[WebSocket] 连接关闭:', event.code, event.reason)
     this.status = WebSocketStatus.DISCONNECTED
     this.stopHeartbeat()
 
@@ -290,14 +277,12 @@ export class WebSocketManager {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
-      console.error('[WebSocket] 达到最大重连次数，停止重连')
       return
     }
 
     this.clearReconnectTimer()
 
     const delay = this.options.reconnectInterval * Math.pow(1.5, this.reconnectAttempts)
-    console.log(`[WebSocket] ${delay}ms 后进行第 ${this.reconnectAttempts + 1} 次重连`)
 
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectAttempts++

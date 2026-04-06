@@ -24,19 +24,16 @@ const loadBillingRules = async () => {
     try {
       parsed = JSON.parse(configStr)
     } catch (parseError) {
-      console.error('计费规则JSON解析失败:', parseError)
       return null
     }
 
     if (!parsed || typeof parsed !== 'object' || !parsed.channels || !Array.isArray(parsed.channels)) {
-      console.error('计费规则数据格式错误')
       return null
     }
 
     billingRules.value = parsed
     return parsed
   } catch (error: any) {
-    console.error('加载计费规则失败', error)
     return null
   } finally {
     loading.value = false

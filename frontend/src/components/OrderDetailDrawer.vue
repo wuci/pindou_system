@@ -219,7 +219,6 @@ const loadOrderDetail = async () => {
     detail.value = await getOrderDetail(props.orderId)
   } catch (error) {
     ElMessage.error('加载订单详情失败')
-    console.error(error)
   } finally {
     loading.value = false
   }

@@ -2,6 +2,7 @@ com\pindou\timer\mapper\TableMapper.class
 com\pindou\timer\service\impl\DiscountServiceImpl.class
 com\pindou\timer\mapper\MemberLevelMapper.class
 com\pindou\timer\service\impl\OrderServiceImpl.class
+com\pindou\timer\mapper\DesignStoreRulesMapper.class
 com\pindou\timer\service\impl\TableServiceImpl$AmountCalculationResult.class
 com\pindou\timer\service\StatisticsService.class
 com\pindou\timer\service\BillingService.class
@@ -12,6 +13,7 @@ com\pindou\timer\service\impl\RechargeRecordServiceImpl.class
 com\pindou\timer\service\DiscountRecordService$Constants.class
 com\pindou\timer\service\DiscountRecordService.class
 com\pindou\timer\service\MemberService.class
+com\pindou\timer\service\impl\DesignStoreRulesServiceImpl.class
 com\pindou\timer\service\impl\MemberServiceImpl.class
 com\pindou\timer\service\impl\OrderSettlementServiceImpl.class
 com\pindou\timer\service\MemberLevelService.class
@@ -54,6 +56,7 @@ com\pindou\timer\service\OrderService.class
 com\pindou\timer\service\RechargeRecordService.class
 com\pindou\timer\service\RoleService.class
 com\pindou\timer\mapper\TableCategoryMapper.class
+com\pindou\timer\service\DesignStoreRulesService.class
 com\pindou\timer\mapper\UserMapper.class
 com\pindou\timer\service\impl\StatisticsServiceImpl.class
 com\pindou\timer\service\RemindService.class

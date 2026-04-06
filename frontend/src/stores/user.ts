@@ -20,7 +20,6 @@ export const useUserStore = defineStore('user', {
 
     // 数据验证：如果有token但没有userInfo，说明数据不完整，清除所有数据
     if (token && !userInfo) {
-      console.warn('检测到不完整的登录数据，已清除')
       storage.remove('token')
       storage.remove('userInfo')
       return {

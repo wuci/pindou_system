@@ -29,6 +29,7 @@ com\pindou\timer\controller\PermissionController.class
 com\pindou\timer\websocket\WebSocketServiceImpl.class
 com\pindou\timer\controller\ETSBaseController.class
 com\pindou\timer\controller\ETSSpaFallbackController.class
+com\pindou\timer\controller\DesignStoreRulesController.class
 com\pindou\timer\interceptor\PermissionInterceptor.class
 com\pindou\timer\controller\UserController.class
 com\pindou\timer\controller\OrderController.class

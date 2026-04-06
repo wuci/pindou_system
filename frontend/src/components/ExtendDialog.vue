@@ -541,22 +541,17 @@ const loadBillingRules = async () => {
   try {
     loadingRules.value = true
     const configStr = await getBillingRuleConfig()
-    console.log('计费规则配置字符串:', configStr)
 
     let parsed: any
     try {
       parsed = JSON.parse(configStr)
     } catch (parseError) {
-      console.error('JSON解析失败:', parseError)
       ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
       setDefaultBillingRules()
       return
     }
 
-    console.log('解析后的计费规则:', parsed)
-
     if (!parsed || typeof parsed !== 'object' || !parsed.channels || !Array.isArray(parsed.channels)) {
-      console.error('计费规则数据格式错误')
       ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
       setDefaultBillingRules()
       return
@@ -565,7 +560,6 @@ const loadBillingRules = async () => {
     // 验证每个渠道的数据结构
     for (const channel of parsed.channels) {
       if (!channel.channel || !channel.channelName || !Array.isArray(channel.rules)) {
-        console.error('渠道数据结构不正确:', channel)
         ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
         setDefaultBillingRules()
         return
@@ -583,7 +577,6 @@ const loadBillingRules = async () => {
       selectedRuleIndex.value = 'unlimited'
     }
   } catch (error: any) {
-    console.error('加载计费规则失败', error)
     ElMessage.error(error.message || '加载计费规则失败')
     setDefaultBillingRules()
   } finally {
@@ -678,7 +671,6 @@ const initializeForm = () => {
       createdAt: 0,
       updatedAt: 0
     }
-    console.log('自动设置会员（续费，已锁定）:', selectedMember.value)
   }
 
   // 使用当前桌台的渠道，如果桌台有渠道且该渠道在计费规则中存在，则使用它
@@ -690,12 +682,10 @@ const initializeForm = () => {
 
   if (channelExists) {
     selectedChannel.value = targetChannel
-    console.log('初始化续费表单，使用桌台渠道:', targetChannel)
   } else {
     // 使用第一条渠道
     const firstChannel = billingRules.value?.channels?.[0]?.channel
     selectedChannel.value = firstChannel || 'store'
-    console.log('初始化续费表单，桌台渠道', targetChannel, '不在计费规则中，使用第一条渠道:', selectedChannel.value)
   }
 
   nextTick(() => {
@@ -752,7 +742,6 @@ const resetForm = () => {
       createdAt: 0,
       updatedAt: 0
     }
-    console.log('自动设置会员（续费，已锁定）:', selectedMember.value)
   }
 
   const defaultChannel = props.table?.channel || 'store'
@@ -776,10 +765,6 @@ const handleConfirm = async () => {
     return
   }
 
-  console.log('=== handleConfirm ===')
-  console.log('selectedRuleIndex:', selectedRuleIndex.value)
-  console.log('selectedChannel:', selectedChannel.value)
-
   // 计算要增加的时长
   let additionalDuration = 0
 
@@ -799,8 +784,6 @@ const handleConfirm = async () => {
       additionalDuration = 0
     }
   }
-
-  console.log('Additional duration:', additionalDuration, 'seconds')
 
   // 验证会员余额是否足够（仅对会员余额支付方式）
   if (selectedMember.value && selectedPaymentMethod.value === 'balance') {
@@ -935,12 +918,8 @@ const handleDiscountChange = async (discountId: string) => {
 
         // 更新续费折后价显示
         extendFinalAmount.value = extendFinalValue
-
-        console.log('续费折扣计算成功: totalOriginal={}, totalFinalAmount={}, extendFinalAmount={}',
-          totalOriginalAmount, response.finalAmount, extendFinalValue)
       }
     } catch (error: any) {
-      console.error('计算续费折扣失败', error)
       // 恢复原价
       extendFinalAmount.value = extendOriginalPrice.value || 0
     }
@@ -976,7 +955,6 @@ const loadDiscounts = async () => {
       ElMessage.warning('暂无可用折扣')
     }
   } catch (error: any) {
-    console.error('加载折扣列表失败', error)
     ElMessage.error('加载折扣列表失败')
   }
 }

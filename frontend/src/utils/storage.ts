@@ -19,7 +19,6 @@ class Storage {
       const data = JSON.stringify(value)
       localStorage.setItem(this.getKey(key), data)
     } catch (error) {
-      console.error('localStorage set error:', error)
     }
   }
 
@@ -31,7 +30,6 @@ class Storage {
       const data = localStorage.getItem(this.getKey(key))
       return data ? JSON.parse(data) : null
     } catch (error) {
-      console.error('localStorage get error:', error)
       return null
     }
   }
@@ -58,7 +56,6 @@ class Storage {
       const data = JSON.stringify(value)
       sessionStorage.setItem(this.getKey(key), data)
     } catch (error) {
-      console.error('sessionStorage set error:', error)
     }
   }
 
@@ -70,7 +67,6 @@ class Storage {
       const data = sessionStorage.getItem(this.getKey(key))
       return data ? JSON.parse(data) : null
     } catch (error) {
-      console.error('sessionStorage get error:', error)
       return null
     }
   }

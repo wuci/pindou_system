@@ -450,14 +450,11 @@ const handleTabChange = (tabName: string | number) => {
 const loadActiveOrders = async () => {
   activeLoading.value = true
   try {
-    console.log('加载当前订单，参数：', activeQueryForm)
     const result = await getActiveOrders(activeQueryForm)
-    console.log('当前订单返回结果：', result)
     activeOrders.value = result.list || []
     activeTotal.value = result.total || 0
   } catch (error) {
     ElMessage.error('加载当前订单失败')
-    console.error(error)
   } finally {
     activeLoading.value = false
   }
@@ -466,14 +463,11 @@ const loadActiveOrders = async () => {
 const loadHistoryOrders = async () => {
   historyLoading.value = true
   try {
-    console.log('加载历史订单，参数：', queryForm)
     const result = await getHistoryOrders(queryForm)
-    console.log('历史订单返回结果：', result)
     historyOrders.value = result.list || []
     total.value = result.total || 0
   } catch (error) {
     ElMessage.error('加载历史订单失败')
-    console.error(error)
   } finally {
     historyLoading.value = false
   }
@@ -505,26 +499,22 @@ const handleDateChange = (values: number[]) => {
 }
 
 const handlePageChange = (page: number) => {
-  console.log('历史订单页码变化：', page)
   queryForm.page = page
   loadHistoryOrders()
 }
 
 const handleSizeChange = (size: number) => {
-  console.log('历史订单每页大小变化：', size)
   queryForm.pageSize = size
   queryForm.page = 1
   loadHistoryOrders()
 }
 
 const handleActivePageChange = (page: number) => {
-  console.log('当前订单页码变化：', page)
   activeQueryForm.page = page
   loadActiveOrders()
 }
 
 const handleActiveSizeChange = (size: number) => {
-  console.log('当前订单每页大小变化：', size)
   activeQueryForm.pageSize = size
   activeQueryForm.page = 1
   loadActiveOrders()
@@ -558,7 +548,6 @@ const handleExport = async () => {
     ElMessage.success('订单导出成功')
   } catch (error) {
     ElMessage.error('导出订单失败')
-    console.error(error)
   } finally {
     exporting.value = false
   }

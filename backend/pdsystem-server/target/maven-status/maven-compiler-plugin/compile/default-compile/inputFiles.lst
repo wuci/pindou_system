@@ -26,6 +26,7 @@ E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\DiscountController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\websocket\TableWebSocketHandler.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\MemberController.java
+E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\DesignStoreRulesController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\ConsumptionRecordController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\TableCategoryController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\LogController.java

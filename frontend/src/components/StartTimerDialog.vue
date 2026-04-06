@@ -472,27 +472,21 @@ const totalDurationPreview = computed(() => {
 const loadSystemConfig = async () => {
   try {
     const configStr = await getSystemConfig()
-    console.log('系统配置字符串:', configStr)
 
     if (!configStr) {
-      console.warn('系统配置为空，使用默认延长时间 30 分钟')
       extendTime.value = 30
       return
     }
 
     // 解析 JSON
     const config = JSON.parse(configStr) as SystemConfig
-    console.log('解析后的系统配置:', config)
 
     if (config && config.extendTime !== undefined && config.extendTime !== null) {
       extendTime.value = config.extendTime
-      console.log('✅ 从系统配置读取延长时间:', config.extendTime, '分钟')
     } else {
-      console.warn('系统配置中未设置延长时间，使用默认值 30 分钟')
       extendTime.value = 30
     }
   } catch (error) {
-    console.error('加载系统配置失败:', error)
     ElMessage.warning('无法获取延长时间配置，使用默认值 30 分钟')
     // 设置默认延长时间为 30 分钟
     extendTime.value = 30
@@ -504,31 +498,25 @@ const loadBillingRules = async () => {
   try {
     loadingRules.value = true
     const configStr = await getBillingRuleConfig()
-    console.log('计费规则配置字符串:', configStr)
 
     let parsed: any
     try {
       parsed = JSON.parse(configStr)
     } catch (parseError) {
-      console.error('JSON解析失败:', parseError)
       ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
       // 设置默认值
       setDefaultBillingRules()
       return
     }
 
-    console.log('解析后的计费规则:', parsed)
-
     // 验证数据结构
     if (!parsed || typeof parsed !== 'object') {
-      console.error('解析后的数据不是对象:', parsed)
       ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
       setDefaultBillingRules()
       return
     }
 
     if (!parsed.channels || !Array.isArray(parsed.channels)) {
-      console.error('channels字段缺失或不是数组:', parsed.channels)
       ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
       setDefaultBillingRules()
       return
@@ -537,7 +525,6 @@ const loadBillingRules = async () => {
     // 验证每个渠道的数据结构
     for (const channel of parsed.channels) {
       if (!channel.channel || !channel.channelName || !Array.isArray(channel.rules)) {
-        console.error('渠道数据结构不正确:', channel)
         ElMessage.error('计费规则数据格式错误，请前往设置页面重新配置')
         setDefaultBillingRules()
         return
@@ -549,7 +536,6 @@ const loadBillingRules = async () => {
     // 默认选中第一条渠道数据
     if (parsed.channels && parsed.channels.length > 0) {
       selectedChannel.value = parsed.channels[0].channel
-      console.log('默认选中第一条渠道:', parsed.channels[0].channelName)
     }
 
     // 使用 nextTick 确保响应式更新后再访问 currentRules
@@ -558,12 +544,8 @@ const loadBillingRules = async () => {
     // 默认选中第一个规则并初始化表单
     if (currentRules.value.length > 0) {
       selectedRuleIndex.value = 0
-      console.log('默认选中规则:', currentRules.value[0])
-    } else {
-      console.warn('当前渠道没有可用的计费规则')
     }
   } catch (error: any) {
-    console.error('加载计费规则失败', error)
     ElMessage.error(error.message || '加载计费规则失败，请前往设置页面重新配置')
     setDefaultBillingRules()
   } finally {
@@ -593,22 +575,17 @@ const setDefaultBillingRules = () => {
 const handleChannelChange = () => {
   // 如果正在初始化，跳过处理（避免与 initializeForm 冲突）
   if (isInitializing.value) {
-    console.log('=== handleChannelChange skipped (initializing) ===')
     return
   }
 
-  console.log('=== Channel changed to', selectedChannel.value)
   // 切换渠道后，默认选中第一个规则
   if (currentRules.value.length > 0) {
     customHours.value = 1
     customMinutes.value = 0
     selectedRuleIndex.value = 0
-    console.log('Set selectedRuleIndex to 0, first rule:', currentRules.value[0])
   } else {
     selectedRuleIndex.value = 'unlimited'
-    console.log('No rules found, set to unlimited')
   }
-  console.log('=====================')
 }
 
 // 规则切换处理
@@ -618,7 +595,6 @@ const handleRuleChange = () => {
 
 // 监听对话框打开
 watch(() => props.modelValue, async (newVal) => {
-  console.log('=== Dialog modelValue changed:', newVal)
   if (newVal) {
     // 对话框打开时，同时加载计费规则和系统配置
     await Promise.all([
@@ -628,12 +604,10 @@ watch(() => props.modelValue, async (newVal) => {
     // 重置到默认选择
     initializeForm()
   }
-  console.log('===========================')
 })
 
 // 初始化表单（每次打开对话框时调用）
 const initializeForm = () => {
-  console.log('=== initializeForm called ===')
   // 设置初始化标志，防止 handleChannelChange 干扰
   isInitializing.value = true
 
@@ -677,7 +651,6 @@ const initializeForm = () => {
     }
     // 更新会员折扣率
     memberDiscount.value = discountRate
-    console.log('自动设置会员:', selectedMember.value)
   }
 
   // 重置为第一条渠道数据
@@ -687,69 +660,48 @@ const initializeForm = () => {
 
   // 使用 nextTick 确保 billingRules 已更新
   nextTick(() => {
-    console.log('initializeForm nextTick: currentRules:', currentRules.value)
     if (currentRules.value.length > 0) {
       const firstRule = currentRules.value[0]
-      console.log('initializeForm: first rule:', firstRule)
 
       // 直接设置 presetDuration，不依赖 watch
       if (firstRule && !firstRule.unlimited && firstRule.minutes) {
         form.value.presetDuration = firstRule.minutes * 60
-        console.log('initializeForm: Directly set presetDuration to', form.value.presetDuration)
       } else {
         form.value.presetDuration = 0
-        console.log('initializeForm: Set presetDuration to 0 (unlimited or invalid)')
       }
 
       // 然后再设置其他状态（用于 UI 显示）
       customHours.value = 1
       customMinutes.value = 0
       selectedRuleIndex.value = 0
-
-      console.log('initializeForm: Set selectedRuleIndex to 0')
     } else {
       form.value.presetDuration = 0
       selectedRuleIndex.value = 'unlimited'
-      console.log('initializeForm: No rules found, set to unlimited')
     }
 
     // 清除初始化标志
     nextTick(() => {
       isInitializing.value = false
-      console.log('initializeForm: Initialization complete, presetDuration =', form.value.presetDuration)
     })
   })
-  console.log('=========================')
 }
 
 // 监听规则选择变化，自动设置预设时长
 watch(
   [selectedRuleIndex, customHours, customMinutes],
   () => {
-    console.log('=== Watch triggered ===')
-    console.log('selectedRuleIndex:', selectedRuleIndex.value)
-    console.log('currentRules:', currentRules.value)
-    console.log('customHours:', customHours.value, 'customMinutes:', customMinutes.value)
-
     if (selectedRuleIndex.value === 'unlimited') {
       form.value.presetDuration = 0
-      console.log('Set presetDuration to 0 (unlimited)')
     } else if (selectedRuleIndex.value === 'custom') {
       form.value.presetDuration = customHours.value * 3600 + customMinutes.value * 60
-      console.log('Set presetDuration to', form.value.presetDuration, '(custom)')
     } else if (typeof selectedRuleIndex.value === 'number') {
       const rule = currentRules.value[selectedRuleIndex.value]
-      console.log('Rule at index', selectedRuleIndex.value, ':', rule)
       if (rule && !rule.unlimited && rule.minutes) {
         form.value.presetDuration = rule.minutes * 60
-        console.log('Set presetDuration to', form.value.presetDuration, '(rule:', rule.minutes, 'minutes)')
       } else {
         form.value.presetDuration = 0
-        console.log('Set presetDuration to 0 (invalid rule)')
       }
     }
-    console.log('Final presetDuration:', form.value.presetDuration)
-    console.log('=====================')
   }
   // 移除 immediate: true，避免在计费规则加载前触发
 )
@@ -792,17 +744,6 @@ const handleConfirm = async () => {
     return
   }
 
-  console.log('=== handleConfirm ===')
-  console.log('selectedRuleIndex:', selectedRuleIndex.value)
-  console.log('selectedChannel:', selectedChannel.value)
-  console.log('customHours:', customHours.value, 'customMinutes:', customMinutes.value)
-  console.log('currentRules:', currentRules.value)
-  console.log('selectedMember:', selectedMember.value)
-  if (typeof selectedRuleIndex.value === 'number') {
-    console.log('Selected rule:', currentRules.value[selectedRuleIndex.value])
-  }
-  console.log('====================')
-
   // 直接根据选择的规则计算套餐时长（不包含延长时间）
   let packageDuration = 0
 
@@ -827,10 +768,6 @@ const handleConfirm = async () => {
   // 延长时间仅用于前端展示，不传给后端
   const extendDuration = extendTime.value * 60
   const totalDisplayDuration = packageDuration + extendDuration
-
-  console.log('套餐时长:', packageDuration, '秒')
-  console.log('延长时间:', extendDuration, '秒 (', extendTime.value, '分钟)')
-  console.log('总时长（仅展示）:', totalDisplayDuration, '秒')
 
   // 验证会员余额是否足够（仅对会员余额支付方式）
   if (selectedMember.value && selectedPaymentMethod.value === 'balance') {
@@ -934,12 +871,8 @@ const handleDiscountChange = async (discountId: string) => {
         // 更新折扣价格显示
         discountedPrice.value = response.finalAmount
         memberDiscount.value = response.discountRate
-
-        console.log('折扣计算成功: originalPrice={}, finalAmount={}, discountRate={}',
-          originalPrice.value, response.finalAmount, response.discountRate)
       }
     } catch (error: any) {
-      console.error('计算折扣失败', error)
       // 恢复原价
       discountedPrice.value = originalPrice.value
       memberDiscount.value = 1
@@ -977,7 +910,6 @@ const loadDiscounts = async () => {
       ElMessage.warning('暂无可用折扣')
     }
   } catch (error: any) {
-    console.error('加载折扣列表失败', error)
     ElMessage.error('加载折扣列表失败')
   }
 }

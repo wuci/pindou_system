@@ -84,9 +84,26 @@
         <!-- 纯空闲状态 -->
         <template v-else>
           <div class="table-card__idle">
-            <el-icon :size="48" color="#67C23A">
-              <CircleCheck />
-            </el-icon>
+            <!-- 温柔岛屿图标 -->
+            <svg class="idle-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+              <!-- 岛屿 -->
+              <ellipse cx="24" cy="28" rx="14" ry="10" fill="url(#idleIslandGradient)" opacity="0.9"/>
+              <!-- 光点 -->
+              <circle cx="20" cy="28" r="2" fill="#fff" opacity="0.9"/>
+              <circle cx="28" cy="26" r="2.5" fill="#fff" opacity="0.95"/>
+              <circle cx="24" cy="32" r="1.5" fill="#fff" opacity="0.85"/>
+              <!-- 连接 -->
+              <line x1="20" y1="28" x2="28" y2="26" stroke="#fff" stroke-width="0.8" opacity="0.4"/>
+              <line x1="20" y1="28" x2="24" y2="32" stroke="#fff" stroke-width="0.8" opacity="0.3"/>
+              <!-- 水波 -->
+              <path d="M12 38 Q18 36 24 38 Q30 40 36 38" fill="none" stroke="#98d4bb" stroke-width="1.5" opacity="0.4"/>
+              <defs>
+                <linearGradient id="idleIslandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#b8e8d8"/>
+                  <stop offset="100%" stop-color="#98d4bb"/>
+                </linearGradient>
+              </defs>
+            </svg>
             <div class="table-card__idle-text">空闲中</div>
           </div>
         </template>
@@ -490,18 +507,18 @@ const formattedReservationEndTime = computed(() => {
 
 /* 状态颜色 */
 .table-card--idle {
-  border-color: #67C23A;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e8f5e9 100%);
+  border-color: #98d4bb;
+  background: linear-gradient(135deg, #f0fdfa 0%, #e8f5e9 100%);
 }
 
 .table-card--using {
-  border-color: #409EFF;
-  background: linear-gradient(135deg, #e3f2fd 0%, #e8f4ff 100%);
+  border-color: #d4a5ff;
+  background: linear-gradient(135deg, #f3e7ff 0%, #ffeef8 100%);
 }
 
 .table-card--paused {
-  border-color: #E6A23C;
-  background: linear-gradient(135deg, #fff8e6 0%, #fef3e2 100%);
+  border-color: #ffb6d9;
+  background: linear-gradient(135deg, #fff0f5 0%, #fef3f2 100%);
 }
 
 /* 即将到期 - 黄色闪烁 */
@@ -633,8 +650,24 @@ const formattedReservationEndTime = computed(() => {
   flex: 1;
 }
 
+.table-card__idle .idle-icon {
+  width: 56px;
+  height: 56px;
+  animation: gentleIdleFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(152, 216, 187, 0.3));
+}
+
+@keyframes gentleIdleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
 .table-card__idle-text {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 15px;
   color: #67C23A;
   font-weight: 500;

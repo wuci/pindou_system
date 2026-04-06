@@ -212,7 +212,6 @@ const loadLevels = async () => {
     levelList.value = result
   } catch (error) {
     ElMessage.error('加载等级列表失败')
-    console.error(error)
   } finally {
     loading.value = false
   }

@@ -33,7 +33,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
    */
   function init(userId?: string) {
     if (isInitialized.value) {
-      console.warn('[WebSocketStore] 已经初始化，无需重复初始化')
       return
     }
 
@@ -54,7 +53,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
     wsManager.value.on('*', (message: WebSocketMessage) => {
       if (message.type === WebSocketMessageType.SYSTEM) {
         // 系统消息可以在这里处理
-        console.log('[WebSocketStore] 系统消息:', message.data)
       }
     })
 
@@ -62,7 +60,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
     updateStatus()
 
     isInitialized.value = true
-    console.log('[WebSocketStore] 初始化完成')
   }
 
   /**
@@ -99,7 +96,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
    */
   function onTableStatusChange(callback: (data: TableStatusData) => void) {
     if (!wsManager.value) {
-      console.warn('[WebSocketStore] WebSocket 未初始化')
       return () => {}
     }
 
@@ -113,7 +109,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
    */
   function onRemind(callback: (data: RemindData) => void) {
     if (!wsManager.value) {
-      console.warn('[WebSocketStore] WebSocket 未初始化')
       return () => {}
     }
 
@@ -127,7 +122,6 @@ export const useWebSocketStore = defineStore('websocket', () => {
    */
   function onMessage(callback: (message: WebSocketMessage) => void) {
     if (!wsManager.value) {
-      console.warn('[WebSocketStore] WebSocket 未初始化')
       return () => {}
     }
 

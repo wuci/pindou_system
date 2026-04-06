@@ -400,7 +400,6 @@ const loadSystemConfig = async () => {
       }
     }
   } catch (error) {
-    console.error('加载系统配置失败:', error)
   }
 }
 
@@ -442,7 +441,6 @@ const loadLayout = async () => {
       initDefaultLayout()
     }
   } catch (error) {
-    console.error('加载布局配置失败:', error)
     initDefaultLayout()
   }
 }
@@ -482,7 +480,6 @@ const saveLayout = async () => {
     // 保存后退出编辑模式
     layoutEditMode.value = false
   } catch (error) {
-    console.error('保存布局配置失败:', error)
     ElMessage.error('保存布局配置失败')
   }
 }
