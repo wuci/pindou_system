@@ -124,7 +124,7 @@ const rules = {
 }
 
 // 生成粒子样式
-const getParticleStyle = (index: number) => {
+const getParticleStyle = (_index: number) => {
   const size = Math.random() * 60 + 20
   const left = Math.random() * 100
   const delay = Math.random() * 5

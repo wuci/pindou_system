@@ -765,10 +765,6 @@ const handleConfirm = async () => {
     }
   }
 
-  // 延长时间仅用于前端展示，不传给后端
-  const extendDuration = extendTime.value * 60
-  const totalDisplayDuration = packageDuration + extendDuration
-
   // 验证会员余额是否足够（仅对会员余额支付方式）
   if (selectedMember.value && selectedPaymentMethod.value === 'balance') {
     const memberBalance = selectedMember.value.balance || 0

@@ -207,7 +207,7 @@ let isRedirecting = false
 /**
  * 路由守卫
  */
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   try {
     // 如果正在重定向，直接放行，避免无限循环
     if (isRedirecting) {

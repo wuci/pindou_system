@@ -401,11 +401,6 @@ const serviceList = computed(() => {
   return []
 })
 
-// 特色服务列表
-const specialServices = computed(() => {
-  return rulesData.value.services.filter(r => r.ruleType === RuleType.SPECIAL)
-})
-
 // 权限检查 - 是否可以编辑规则
 const canEditRules = computed(() => {
   const permissions = userStore.permissions || []
@@ -415,16 +410,6 @@ const canEditRules = computed(() => {
 // 对话框状态
 const dialogVisible = ref(false)
 const currentRule = ref<StoreRule | null>(null)
-
-// 获取指定分类和类型的规则内容
-const getRuleContent = (category: string, ruleType?: string) => {
-  const rules = rulesData.value[category] || []
-  if (ruleType) {
-    const rule = rules.find(r => r.ruleType === ruleType)
-    return rule?.content || ''
-  }
-  return rules
-}
 
 // 打开新增规则对话框
 const handleCreateRule = () => {

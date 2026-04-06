@@ -256,14 +256,14 @@ export class WebSocketManager {
   /**
    * 处理连接错误
    */
-  private handleError(event: Event): void {
+  private handleError(_event: Event): void {
     this.status = WebSocketStatus.ERROR
   }
 
   /**
    * 处理连接关闭
    */
-  private handleClose(event: CloseEvent): void {
+  private handleClose(_event: CloseEvent): void {
     this.status = WebSocketStatus.DISCONNECTED
     this.stopHeartbeat()
 

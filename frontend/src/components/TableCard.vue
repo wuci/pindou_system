@@ -242,7 +242,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Clock, CircleCheck, Edit, Calendar } from '@element-plus/icons-vue'
+import { Clock, Edit, Calendar } from '@element-plus/icons-vue'
 import type { TableInfo } from '@/api/table'
 import { useUserStore } from '@/stores/user'
 

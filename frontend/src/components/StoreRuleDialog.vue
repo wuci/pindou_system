@@ -82,7 +82,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, FormInstance } from 'element-plus'
-import { createRule, updateRule, type StoreRuleRequest } from '@/api/storeRules'
+import { createRule, updateRule, type StoreRuleRequest, type StoreRule } from '@/api/storeRules'
 
 interface Props {
   modelValue: boolean

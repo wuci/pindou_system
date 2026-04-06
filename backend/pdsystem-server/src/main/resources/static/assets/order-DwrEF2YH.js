@@ -1,1 +1,0 @@
-import{h as r}from"./index-CCY1b-oD.js";const s=s=>r.get("/orders/active",{params:s}),e=s=>r.get("/orders/history",{params:s}),a=s=>r.get(`/orders/${s}`),o=s=>r.get("/orders/export",{params:s,responseType:"blob"});export{a,e as b,o as e,s as g};

@@ -120,7 +120,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Money, Document, OfficeBuilding, TrendCharts } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getDailyStats, getRevenueTrend, type DailyStats, type TrendItem } from '@/api/report'
 
