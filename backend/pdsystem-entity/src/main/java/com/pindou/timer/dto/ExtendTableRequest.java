@@ -35,4 +35,7 @@ public class ExtendTableRequest implements Serializable {
 
     @Schema(description = "备注", example = "客户续费")
     private String note;
+
+    @Schema(description = "活动折扣ID", example = "123")
+    private String discountId;
 }

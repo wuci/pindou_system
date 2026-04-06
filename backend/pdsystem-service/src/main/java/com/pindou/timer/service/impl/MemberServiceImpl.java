@@ -208,7 +208,7 @@ public class MemberServiceImpl extends ServiceImpl<MemberMapper, Member> impleme
 
     @Override
     public CalculateDiscountResponse calculateDiscount(Long memberId, CalculateDiscountRequest request) {
-        log.info("计算会员折扣: memberId={}, originalAmount={}", memberId, request.getOriginalAmount());
+        log.info("计算会员折扣: memberId={}, amount={}", memberId, request.getAmount());
 
         // 查询会员
         Member member = getById(memberId);
@@ -223,7 +223,7 @@ public class MemberServiceImpl extends ServiceImpl<MemberMapper, Member> impleme
         }
 
         // 计算折扣
-        BigDecimal originalAmount = request.getOriginalAmount();
+        BigDecimal originalAmount = request.getAmount();
         BigDecimal discountRate = level.getDiscountRate();
         BigDecimal discountAmount = originalAmount.multiply(BigDecimal.ONE.subtract(discountRate))
                 .setScale(2, RoundingMode.HALF_UP);

@@ -121,51 +121,51 @@
             </plugin>
 
             <!-- 前端构建插件 -->
-            <plugin>
-                <groupId>com.github.eirslett</groupId>
-                <artifactId>frontend-maven-plugin</artifactId>
-                <version>1.14.2</version>
-                <configuration>
-                    <workingDirectory>../../frontend</workingDirectory>
-                    <nodeVersion>v18.18.0</nodeVersion>
-                    <npmVersion>9.8.1</npmVersion>
-                </configuration>
-                <executions>
-                    <!-- 安装 Node.js 和 npm -->
-                    <execution>
-                        <id>install node and npm</id>
-                        <goals>
-                            <goal>install-node-and-npm</goal>
-                        </goals>
-                        <phase>generate-resources</phase>
-                    </execution>
-                    <!-- 安装依赖 -->
-                    <execution>
-                        <id>npm install</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <phase>generate-resources</phase>
-                        <configuration>
-                            <arguments>install --registry=https://registry.npmmirror.com</arguments>
-                        </configuration>
-                    </execution>
-                    <!-- 构建前端 -->
-                    <execution>
-                        <id>npm run build</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <phase>generate-resources</phase>
-                        <configuration>
-                            <arguments>run build</arguments>
-                            <environmentVariables>
-                                <NODE_ENV>production</NODE_ENV>
-                            </environmentVariables>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+<!--            <plugin>-->
+<!--                <groupId>com.github.eirslett</groupId>-->
+<!--                <artifactId>frontend-maven-plugin</artifactId>-->
+<!--                <version>1.14.2</version>-->
+<!--                <configuration>-->
+<!--                    <workingDirectory>../../frontend</workingDirectory>-->
+<!--                    <nodeVersion>v18.18.0</nodeVersion>-->
+<!--                    <npmVersion>9.8.1</npmVersion>-->
+<!--                </configuration>-->
+<!--                <executions>-->
+<!--                    &lt;!&ndash; 安装 Node.js 和 npm &ndash;&gt;-->
+<!--                    <execution>-->
+<!--                        <id>install node and npm</id>-->
+<!--                        <goals>-->
+<!--                            <goal>install-node-and-npm</goal>-->
+<!--                        </goals>-->
+<!--                        <phase>generate-resources</phase>-->
+<!--                    </execution>-->
+<!--                    &lt;!&ndash; 安装依赖 &ndash;&gt;-->
+<!--                    <execution>-->
+<!--                        <id>npm install</id>-->
+<!--                        <goals>-->
+<!--                            <goal>npm</goal>-->
+<!--                        </goals>-->
+<!--                        <phase>generate-resources</phase>-->
+<!--                        <configuration>-->
+<!--                            <arguments>install &#45;&#45;registry=https://registry.npmmirror.com</arguments>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                    &lt;!&ndash; 构建前端 &ndash;&gt;-->
+<!--                    <execution>-->
+<!--                        <id>npm run build</id>-->
+<!--                        <goals>-->
+<!--                            <goal>npm</goal>-->
+<!--                        </goals>-->
+<!--                        <phase>generate-resources</phase>-->
+<!--                        <configuration>-->
+<!--                            <arguments>run build</arguments>-->
+<!--                            <environmentVariables>-->
+<!--                                <NODE_ENV>production</NODE_ENV>-->
+<!--                            </environmentVariables>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
 
             <!-- Spring Boot 打包插件 -->
             <plugin>

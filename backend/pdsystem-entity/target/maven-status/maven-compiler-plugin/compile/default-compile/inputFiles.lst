@@ -1,4 +1,5 @@
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LogInfoResponse.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\DiscountResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\ConsumptionRecord.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\Order.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CreateMemberRequest.java
@@ -6,6 +7,7 @@ E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\MemberLevelResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\common\result\ErrorCode.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CreateUserRequest.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\OrderAmountCalculation.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\OperationLog.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LogQueryRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UpdateRoleRequest.java
@@ -29,11 +31,13 @@ E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CreateRoleRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UpdateUserRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\common\exception\PDException.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\DiscountQueryRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RoleQueryRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\AmountDetail.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\SystemConfigRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\MemberQueryRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\OrderQueryRequest.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UpdateDiscountRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\RechargeRecord.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CalculateDiscountResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RevenueTrendRequest.java
@@ -51,6 +55,7 @@ E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UpdateMemberRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UserQueryRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ResetPasswordRequest.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\Discount.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\UserResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\TableConfigRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\PermissionResponse.java
@@ -58,10 +63,14 @@ E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ConfigResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\TableCategory.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CreateMemberLevelRequest.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\DurationCalculation.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\Member.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CalculateDiscountByIdRequest.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\CreateDiscountRequest.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\entity\Config.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\LoginResponse.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\BillingRule.java
+E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\constants\TableConstants.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\common\result\Result.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\RevenueTrendItem.java
 E:\ai_project\pindouTimer\backend\pdsystem-entity\src\main\java\com\pindou\timer\dto\ReservationRequest.java

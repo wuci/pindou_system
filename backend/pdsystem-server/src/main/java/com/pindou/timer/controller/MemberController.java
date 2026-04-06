@@ -155,7 +155,7 @@ public class MemberController extends ETSBaseController {
             @Parameter(description = "会员ID") @PathVariable("id") Long memberId,
             @Validated @RequestBody CalculateDiscountRequest request) {
 
-        log.info("计算会员折扣请求: memberId={}, originalAmount={}", memberId, request.getOriginalAmount());
+        log.info("计算会员折扣请求: memberId={}, amount={}", memberId, request.getAmount());
 
         CalculateDiscountResponse response = memberService.calculateDiscount(memberId, request);
 

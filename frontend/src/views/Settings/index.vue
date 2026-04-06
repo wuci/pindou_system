@@ -276,6 +276,91 @@
           </div>
         </el-tab-pane>
 
+        <!-- 折扣设置 -->
+        <el-tab-pane v-if="permissions.canConfigDiscount" label="折扣设置" name="discount">
+          <div class="tab-content">
+            <!-- 操作按钮 -->
+            <div class="section-header">
+              <h3>折扣列表</h3>
+              <el-button type="primary" :icon="Plus" @click="showAddDiscountDialog">
+                添加折扣
+              </el-button>
+            </div>
+
+            <!-- 折扣列表 -->
+            <div class="discount-list">
+              <div
+                v-for="discount in discountList"
+                :key="discount.id"
+                class="discount-item"
+              >
+                <div class="discount-info">
+                  <div class="discount-name">{{ discount.name }}</div>
+                  <div class="discount-details">
+                    <el-tag :type="discount.status === 1 ? 'success' : 'info'" size="small">
+                      {{ discount.status === 1 ? '启用' : '禁用' }}
+                    </el-tag>
+                    <el-tag size="small" style="margin-left: 8px">
+                      {{ discount.typeName }}
+                    </el-tag>
+                    <span class="discount-rate">{{ (discount.discountRate * 10).toFixed(1) }}折</span>
+                    <span v-if="discount.minAmount" class="discount-condition">
+                      满{{ discount.minAmount }}元
+                    </span>
+                    <span v-if="discount.memberLevelName" class="discount-condition">
+                      {{ discount.memberLevelName }}
+                    </span>
+                  </div>
+                  <div v-if="discount.description" class="discount-desc">
+                    {{ discount.description }}
+                  </div>
+                </div>
+                <div class="discount-actions">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    @click="editDiscount(discount)"
+                  >
+                    编辑
+                  </el-button>
+                  <el-button
+                    :type="discount.status === 1 ? 'warning' : 'success'"
+                    size="small"
+                    @click="toggleDiscountStatus(discount)"
+                  >
+                    {{ discount.status === 1 ? '禁用' : '启用' }}
+                  </el-button>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    @click="deleteDiscount(discount)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
+
+              <el-empty v-if="discountList.length === 0" description="暂无折扣设置" />
+            </div>
+
+            <!-- 说明信息 -->
+            <el-alert
+              title="折扣说明"
+              type="info"
+              :closable="false"
+              show-icon
+              style="margin-top: 20px"
+            >
+              <template #default>
+                <div>• 固定折扣：适用于所有订单，按设置的折扣率计算</div>
+                <div>• 会员折扣：仅适用于指定会员等级的会员</div>
+                <div>• 活动折扣：可用于特定活动，可设置有效期</div>
+                <div>• 系统会自动选择最优惠的折扣应用到订单</div>
+              </template>
+            </el-alert>
+          </div>
+        </el-tab-pane>
+
       </el-tabs>
     </el-card>
 
@@ -310,6 +395,131 @@
         <el-button type="primary" @click="handleAddChannel">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 添加/编辑折扣对话框 -->
+    <el-dialog
+      v-model="discountDialogVisible"
+      :title="discountDialogMode === 'add' ? '添加折扣' : '编辑折扣'"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form ref="discountFormRef" :model="discountForm" :rules="discountRules" label-width="120px">
+        <el-form-item label="折扣名称" prop="name">
+          <el-input
+            v-model="discountForm.name"
+            placeholder="请输入折扣名称，如: 全场9折"
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+
+        <el-form-item label="折扣类型" prop="type">
+          <el-select v-model="discountForm.type" placeholder="请选择折扣类型" style="width: 100%">
+            <el-option :value="1" label="固定折扣" />
+            <el-option :value="2" label="会员折扣" />
+            <el-option :value="3" label="活动折扣" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="折扣率" prop="discountRate">
+          <el-input-number
+            v-model="discountForm.discountRate"
+            :min="0.1"
+            :max="1.0"
+            :step="0.05"
+            :precision="2"
+            style="width: 200px"
+          />
+          <span class="unit">（0.9表示9折）</span>
+        </el-form-item>
+
+        <el-form-item label="最低消费金额">
+          <el-input-number
+            v-model="discountForm.minAmount"
+            :min="0"
+            :precision="2"
+            style="width: 200px"
+          />
+          <span class="unit">元，留空表示无限制</span>
+        </el-form-item>
+
+        <el-form-item label="最高优惠金额">
+          <el-input-number
+            v-model="discountForm.maxDiscount"
+            :min="0"
+            :precision="2"
+            style="width: 200px"
+          />
+          <span class="unit">元，留空表示无限制</span>
+        </el-form-item>
+
+        <el-form-item v-if="discountForm.type === 2" label="会员等级" prop="memberLevelId">
+          <el-select v-model="discountForm.memberLevelId" placeholder="请选择会员等级" style="width: 100%">
+            <el-option
+              v-for="level in memberLevels"
+              :key="level.id"
+              :value="level.id"
+              :label="level.name"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="开始时间">
+          <el-date-picker
+            v-model="discountForm.startTime"
+            type="datetime"
+            placeholder="留空表示立即生效"
+            style="width: 100%"
+            :format="'YYYY-MM-DD HH:mm:ss'"
+            :value-format="'X'"
+            @change="handleStartTimeChange"
+          />
+        </el-form-item>
+
+        <el-form-item label="结束时间">
+          <el-date-picker
+            v-model="discountForm.endTime"
+            type="datetime"
+            placeholder="留空表示永久有效"
+            style="width: 100%"
+            :format="'YYYY-MM-DD HH:mm:ss'"
+            :value-format="'X'"
+            @change="handleEndTimeChange"
+          />
+        </el-form-item>
+
+        <el-form-item label="状态" prop="status">
+          <el-radio-group v-model="discountForm.status">
+            <el-radio :value="1">启用</el-radio>
+            <el-radio :value="0">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="排序">
+          <el-input-number
+            v-model="discountForm.sort"
+            :min="0"
+            style="width: 200px"
+          />
+          <span class="unit">数值越小越靠前</span>
+        </el-form-item>
+
+        <el-form-item label="描述">
+          <el-input
+            v-model="discountForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入折扣描述"
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="discountDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="discountSaving" @click="saveDiscount">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -330,6 +540,17 @@ import {
   type RemindConfig,
   type SystemConfig
 } from '@/api/config'
+import {
+  getDiscountList,
+  createDiscount,
+  updateDiscount,
+  deleteDiscount as deleteDiscountApi,
+  updateDiscountStatus,
+  type DiscountInfo,
+  type CreateDiscountParams,
+  type UpdateDiscountParams
+} from '@/api/discount'
+import { getMemberLevelList, type MemberLevelInfo } from '@/api/memberLevel'
 import { useUserStore } from '@/stores/user'
 
 // 用户状态和权限
@@ -338,7 +559,8 @@ const userStore = useUserStore()
 const permissions = computed(() => ({
   canConfigRule: userStore.hasPermission('system:rule'),
   canConfigRemind: userStore.hasPermission('system:remind'),
-  canConfigParam: userStore.hasPermission('system:param')
+  canConfigParam: userStore.hasPermission('system:param'),
+  canConfigDiscount: userStore.hasPermission('system:discount')
 }))
 
 // 当前激活的标签 - 根据权限自动选择第一个有权限的tab
@@ -798,7 +1020,199 @@ onMounted(() => {
   loadBillingConfig()
   loadRemindConfig()
   loadSystemConfig()
+  loadDiscountList()
+  loadMemberLevels()
 })
+
+// ==================== 折扣设置相关 ====================
+
+const discountList = ref<DiscountInfo[]>([])
+const memberLevels = ref<MemberLevelInfo[]>([])
+const discountDialogVisible = ref(false)
+const discountDialogMode = ref<'add' | 'edit'>('add')
+const discountFormRef = ref<FormInstance>()
+const discountSaving = ref(false)
+const editingDiscountId = ref<string>('')
+
+const discountForm = reactive<CreateDiscountParams & { startTime?: number; endTime?: number }>({
+  name: '',
+  type: 1,
+  discountRate: 0.9,
+  minAmount: undefined,
+  maxDiscount: undefined,
+  memberLevelId: undefined,
+  startTime: undefined,
+  endTime: undefined,
+  status: 1,
+  sort: 0,
+  description: ''
+})
+
+const discountRules: FormRules = {
+  name: [{ required: true, message: '请输入折扣名称', trigger: 'blur' }],
+  type: [{ required: true, message: '请选择折扣类型', trigger: 'change' }],
+  discountRate: [{ required: true, message: '请输入折扣率', trigger: 'blur' }],
+  memberLevelId: [
+    {
+      validator: (_rule, _value, callback) => {
+        if (discountForm.type === 2 && !discountForm.memberLevelId) {
+          callback(new Error('会员折扣必须选择会员等级'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ],
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+}
+
+// 加载折扣列表
+const loadDiscountList = async () => {
+  try {
+    const result = await getDiscountList({ page: 1, pageSize: 100 })
+    discountList.value = result.list
+  } catch (error) {
+    console.error('加载折扣列表失败', error)
+  }
+}
+
+// 加载会员等级列表
+const loadMemberLevels = async () => {
+  try {
+    memberLevels.value = await getMemberLevelList()
+  } catch (error) {
+    console.error('加载会员等级失败', error)
+  }
+}
+
+// 显示添加折扣对话框
+const showAddDiscountDialog = () => {
+  discountDialogMode.value = 'add'
+  editingDiscountId.value = ''
+  Object.assign(discountForm, {
+    name: '',
+    type: 1,
+    discountRate: 0.9,
+    minAmount: undefined,
+    maxDiscount: undefined,
+    memberLevelId: undefined,
+    startTime: undefined,
+    endTime: undefined,
+    status: 1,
+    sort: 0,
+    description: ''
+  })
+  discountDialogVisible.value = true
+}
+
+// 编辑折扣
+const editDiscount = (discount: DiscountInfo) => {
+  discountDialogMode.value = 'edit'
+  editingDiscountId.value = discount.id
+  Object.assign(discountForm, {
+    name: discount.name,
+    type: discount.type,
+    discountRate: discount.discountRate,
+    minAmount: discount.minAmount || undefined,
+    maxDiscount: discount.maxDiscount || undefined,
+    memberLevelId: discount.memberLevelId || undefined,
+    startTime: discount.startTime ? discount.startTime / 1000 : undefined,
+    endTime: discount.endTime ? discount.endTime / 1000 : undefined,
+    status: discount.status,
+    sort: discount.sort,
+    description: discount.description || ''
+  })
+  discountDialogVisible.value = true
+}
+
+// 保存折扣
+const saveDiscount = async () => {
+  if (!discountFormRef.value) return
+
+  try {
+    await discountFormRef.value.validate()
+    discountSaving.value = true
+
+    const data: CreateDiscountParams | UpdateDiscountParams = {
+      name: discountForm.name,
+      type: discountForm.type,
+      discountRate: discountForm.discountRate,
+      minAmount: discountForm.minAmount,
+      maxDiscount: discountForm.maxDiscount,
+      memberLevelId: discountForm.memberLevelId,
+      startTime: discountForm.startTime ? discountForm.startTime * 1000 : undefined,
+      endTime: discountForm.endTime ? discountForm.endTime * 1000 : undefined,
+      status: discountForm.status,
+      sort: discountForm.sort || 0,
+      description: discountForm.description
+    }
+
+    if (discountDialogMode.value === 'add') {
+      await createDiscount(data as CreateDiscountParams)
+      ElMessage.success('添加成功')
+    } else {
+      await updateDiscount(editingDiscountId.value, data as UpdateDiscountParams)
+      ElMessage.success('更新成功')
+    }
+
+    discountDialogVisible.value = false
+    loadDiscountList()
+  } catch (error) {
+    if (error !== false) {
+      ElMessage.error(discountDialogMode.value === 'add' ? '添加失败' : '更新失败')
+    }
+  } finally {
+    discountSaving.value = false
+  }
+}
+
+// 切换折扣状态
+const toggleDiscountStatus = async (discount: DiscountInfo) => {
+  const newStatus = discount.status === 1 ? 0 : 1
+  const statusText = newStatus === 1 ? '启用' : '禁用'
+
+  try {
+    await updateDiscountStatus(discount.id, newStatus)
+    ElMessage.success(`${statusText}成功`)
+    loadDiscountList()
+  } catch (error) {
+    ElMessage.error(`${statusText}失败`)
+  }
+}
+
+// 删除折扣
+const deleteDiscount = (discount: DiscountInfo) => {
+  ElMessageBox.confirm(
+    `确定要删除"${discount.name}"折扣吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await deleteDiscountApi(discount.id)
+      ElMessage.success('删除成功')
+      loadDiscountList()
+    } catch (error) {
+      ElMessage.error('删除失败')
+    }
+  }).catch(() => {
+    // 取消删除
+  })
+}
+
+// 处理开始时间变化
+const handleStartTimeChange = (value: number | undefined) => {
+  discountForm.startTime = value
+}
+
+// 处理结束时间变化
+const handleEndTimeChange = (value: number | undefined) => {
+  discountForm.endTime = value
+}
 </script>
 
 <style scoped>
@@ -899,5 +1313,64 @@ onMounted(() => {
   margin-top: 5px;
   font-size: 12px;
   color: #909399;
+}
+
+/* 折扣设置样式 */
+.discount-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.discount-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: white;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.discount-info {
+  flex: 1;
+}
+
+.discount-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.discount-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.discount-rate {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f56c6c;
+  margin-left: 8px;
+}
+
+.discount-condition {
+  font-size: 13px;
+  color: #909399;
+}
+
+.discount-desc {
+  font-size: 13px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.discount-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

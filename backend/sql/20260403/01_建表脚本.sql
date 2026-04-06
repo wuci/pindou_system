@@ -279,20 +279,28 @@ DROP TABLE IF EXISTS `sys_operation_log`;
 
 CREATE TABLE `sys_operation_log` (
   `id` VARCHAR(36) NOT NULL COMMENT '日志ID（UUID）',
-  `user_id` VARCHAR(36) NOT NULL COMMENT '操作用户ID',
-  `username` VARCHAR(50) NOT NULL COMMENT '用户名',
-  `action` VARCHAR(50) NOT NULL COMMENT '操作编码',
-  `action_name` VARCHAR(50) NOT NULL COMMENT '操作名称',
-  `content` TEXT NOT NULL COMMENT '操作内容描述',
-  `target_type` VARCHAR(20) DEFAULT NULL COMMENT '目标类型：table/order/user/role/config',
-  `target_id` VARCHAR(36) DEFAULT NULL COMMENT '目标ID',
-  `ip` VARCHAR(50) DEFAULT NULL COMMENT '操作IP地址',
+  `module` VARCHAR(50) DEFAULT NULL COMMENT '操作模块',
+  `operation` VARCHAR(50) DEFAULT NULL COMMENT '操作类型',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '操作描述',
+  `user_id` VARCHAR(36) DEFAULT NULL COMMENT '操作用户ID',
+  `username` VARCHAR(50) DEFAULT NULL COMMENT '用户名',
+  `method` VARCHAR(200) DEFAULT NULL COMMENT '请求方法',
+  `params` TEXT DEFAULT NULL COMMENT '请求参数',
+  `result` TEXT DEFAULT NULL COMMENT '响应结果',
+  `duration` BIGINT DEFAULT NULL COMMENT '执行时长（毫秒）',
+  `ip` VARCHAR(50) DEFAULT NULL COMMENT '客户端IP',
   `user_agent` VARCHAR(500) DEFAULT NULL COMMENT '用户代理',
-  `execute_time` BIGINT DEFAULT NULL COMMENT '执行耗时（毫秒）',
+  `status` TINYINT(1) DEFAULT 1 COMMENT '操作状态：0-失败，1-成功',
+  `error_msg` VARCHAR(500) DEFAULT NULL COMMENT '错误信息',
+  `content` TEXT DEFAULT NULL COMMENT '操作内容（兼容旧版）',
+  `target_type` VARCHAR(50) DEFAULT NULL COMMENT '目标类型：table/order/user/role/config',
+  `target_id` VARCHAR(36) DEFAULT NULL COMMENT '目标ID',
   `created_at` BIGINT NOT NULL COMMENT '创建时间（毫秒时间戳）',
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
-  KEY `idx_action` (`action`),
+  KEY `idx_module` (`module`),
+  KEY `idx_operation` (`operation`),
+  KEY `idx_status` (`status`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_target` (`target_type`, `target_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
@@ -312,6 +320,36 @@ CREATE TABLE `sys_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_config_key` (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
+
+-- =============================================
+-- 14. 折扣设置表 (biz_discount)
+-- =============================================
+DROP TABLE IF EXISTS `biz_discount`;
+
+CREATE TABLE `biz_discount` (
+  `id` VARCHAR(36) NOT NULL COMMENT '折扣ID（UUID）',
+  `name` VARCHAR(50) NOT NULL COMMENT '折扣名称',
+  `type` TINYINT(1) NOT NULL COMMENT '折扣类型：1-固定折扣 2-会员折扣 3-活动折扣',
+  `discount_rate` DECIMAL(4,3) NOT NULL COMMENT '折扣率（0.9表示9折，1.0表示不打折）',
+  `min_amount` DECIMAL(10,2) DEFAULT NULL COMMENT '最低消费金额（null表示无限制）',
+  `max_discount` DECIMAL(10,2) DEFAULT NULL COMMENT '最高优惠金额（null表示无限制）',
+  `member_level_id` BIGINT DEFAULT NULL COMMENT '会员等级ID（null表示适用于所有会员）',
+  `start_time` BIGINT DEFAULT NULL COMMENT '开始时间（毫秒时间戳，null表示立即生效）',
+  `end_time` BIGINT DEFAULT NULL COMMENT '结束时间（毫秒时间戳，null表示永久有效）',
+  `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  `sort` INT NOT NULL DEFAULT 0 COMMENT '排序（数值越小越靠前）',
+  `description` VARCHAR(200) DEFAULT NULL COMMENT '描述',
+  `created_at` BIGINT NOT NULL COMMENT '创建时间（毫秒时间戳）',
+  `updated_at` BIGINT NOT NULL COMMENT '更新时间（毫秒时间戳）',
+  `deleted_at` BIGINT DEFAULT NULL COMMENT '删除标记：0-未删除，1-已删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_type` (`type`),
+  KEY `idx_status` (`status`),
+  KEY `idx_start_time` (`start_time`),
+  KEY `idx_end_time` (`end_time`),
+  KEY `idx_member_level_id` (`member_level_id`),
+  KEY `idx_sort` (`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='折扣设置表';
 
 -- =============================================
 -- 建表脚本执行完成

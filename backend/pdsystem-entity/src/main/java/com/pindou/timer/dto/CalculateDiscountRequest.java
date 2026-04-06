@@ -19,7 +19,10 @@ public class CalculateDiscountRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Schema(description = "原价", required = true)
-    @NotNull(message = "原价不能为空")
-    private BigDecimal originalAmount;
+    @Schema(description = "订单金额", required = true)
+    @NotNull(message = "订单金额不能为空")
+    private BigDecimal amount;
+
+    @Schema(description = "会员等级ID")
+    private Long memberLevelId;
 }

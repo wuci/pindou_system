@@ -35,4 +35,7 @@ public class StartTimerRequest implements Serializable {
 
     @Schema(description = "支付方式：offline-线下, online-线上, balance-余额, combined-组合", example = "offline")
     private String paymentMethod;
+
+    @Schema(description = "活动折扣ID", example = "123")
+    private String discountId;
 }

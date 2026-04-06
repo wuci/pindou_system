@@ -23,6 +23,7 @@ E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\OrderController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\RemindController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\common\exception\GlobalExceptionHandler.java
+E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\DiscountController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\websocket\TableWebSocketHandler.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\MemberController.java
 E:\ai_project\pindouTimer\backend\pdsystem-server\src\main\java\com\pindou\timer\controller\ConsumptionRecordController.java

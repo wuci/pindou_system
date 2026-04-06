@@ -29,4 +29,7 @@ public class CalculateDiscountResponse implements Serializable {
 
     @Schema(description = "折后金额")
     private BigDecimal finalAmount;
+
+    @Schema(description = "应用的折扣名称")
+    private String appliedDiscountName;
 }

@@ -1,0 +1,98 @@
+# ================================================================================
+# 品多计时器服务 - 本地配置文件
+# @author wuci
+# @date 2026-04-06
+# ================================================================================
+
+# 服务器配置
+server:
+  port: 9026
+
+spring:
+  # 数据源配置
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://8.130.49.28:3306/pindou_timer?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      username: root
+      password: WT0601wt**
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      filters: stat,wall
+      web-stat-filter:
+        enabled: true
+        url-pattern: /*
+        exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
+      stat-view-servlet:
+        enabled: true
+        url-pattern: /druid/*
+        reset-enable: false
+        login-username: admin
+        login-password: admin
+
+  # Redis配置
+  redis:
+    cluster:
+      nodes:
+        - 8.130.49.28:7000
+        - 8.130.49.28:7001
+        - 8.130.49.28:7002
+        - 8.130.49.28:7003
+        - 8.130.49.28:7004
+        - 8.130.49.28:7005
+      max-redirects: 3
+    password:
+    lettuce:
+      pool:
+        max-active: 20
+        max-wait: -1ms
+        max-idle: 10
+        min-idle: 5
+      shutdown-timeout: 100ms
+
+  # Jackson配置
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+    default-property-inclusion: non_null
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# MyBatis-Plus配置
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.pindou.timer.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# JWT配置
+jwt:
+  secret: pindou-timer-secret-key-2024-change-in-production
+  expiration: 604800000
+  header: Authorization
+  prefix: Bearer
+
+# 日志配置
+logging:
+  level:
+    com.pindou.timer: debug
+    com.pindou.timer.mapper: debug
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{50} - %msg%n'
+  file:
+    name: logs/pindou-timer.log

@@ -22,6 +22,7 @@ TRUNCATE TABLE `biz_member`;
 TRUNCATE TABLE `biz_table_layout_config`;
 TRUNCATE TABLE `biz_table_category`;
 TRUNCATE TABLE `biz_member_level`;
+TRUNCATE TABLE `biz_discount`;
 TRUNCATE TABLE `sys_operation_log`;
 TRUNCATE TABLE `sys_user`;
 TRUNCATE TABLE `sys_role`;
@@ -86,14 +87,15 @@ INSERT INTO `sys_permission` (id, parent_id, permission_key, permission_name, pe
 ('member_level_delete', 'member_level', 'member:level:delete', '删除', 'permission', '', '', 4, 1, 1, '删除等级', 1775205986000, 1775205986000, 0),
 ('system_rule', 'system', 'system:rule', '计费规则', 'permission', '', '', 1, 1, 1, '配置计费规则', 1775205986000, 1775205986000, 0),
 ('system_remind', 'system', 'system:remind', '提醒设置', 'permission', '', '', 2, 1, 1, '配置提醒规则', 1775205986000, 1775205986000, 0),
-('system_param', 'system', 'system:param', '系统参数设置', 'permission', '', '', 3, 1, 1, '系统参数配置', 1775205986000, 1775205986000, 0);
+('system_param', 'system', 'system:param', '系统参数设置', 'permission', '', '', 3, 1, 1, '系统参数配置', 1775205986000, 1775205986000, 0),
+('system_discount', 'system', 'system:discount', '折扣设置', 'permission', '', '', 4, 1, 1, '配置折扣规则', 1775205986000, 1775205986000, 0);
 
 -- =============================================
 -- 3. 角色表 (sys_role)
 -- =============================================
 INSERT INTO `sys_role` (id, name, code, permissions, sort, status, is_built_in, description, created_at, updated_at, deleted_at) VALUES
 ('a0000000-0000-0000-0000-000000000001', '超级管理员', 'super_admin', '["*"]', 1, 1, 1, '系统最高权限', 1774583841000, 1774583841000, 0),
-('a0000000-0000-0000-0000-000000000002', '店长', 'manager', '["dashboard:view", "table:category", "table:config", "table:start", "table:end", "table:reserve", "table:bill", "table:extend", "table:pause", "order:view", "order:detail", "order:export", "statistics:view", "member:create", "member:update", "member:recharge", "member:record", "system:rule"]', 2, 1, 1, '管理权限', 1774583841000, 1774962920000, 0),
+('a0000000-0000-0000-0000-000000000002', '店长', 'manager', '["dashboard:view", "table:category", "table:config", "table:start", "table:end", "table:reserve", "table:bill", "table:extend", "table:pause", "order:view", "order:detail", "order:export", "statistics:view", "member:create", "member:update", "member:recharge", "member:record", "system:rule", "system:discount"]', 2, 1, 1, '管理权限', 1774583841000, 1774962920000, 0),
 ('a0000000-0000-0000-0000-000000000003', '店员', 'staff', '["dashboard-module", "dashboard:view", "table:view", "table:start", "table:pause", "table:resume", "table:extend", "table:end", "table:ignore", "member:view", "member:create", "member:update", "member:recharge"]', 3, 1, 1, '操作权限', 1774583842000, 1774962920000, 0),
 ('a0000000-0000-0000-0000-000000000004', '只读用户', 'readonly', '["table:view", "order:view", "order:detail", "report:view"]', 4, 1, 1, '查看权限', 1774583842000, 1774583842000, 0);
 
@@ -123,7 +125,15 @@ INSERT INTO `biz_member_level` (id, name, min_amount, max_amount, discount_rate,
 (4, '熔豆典藏', 3000.01, NULL, 0.800, 4, 1774959221249, 1774959221249);
 
 -- =============================================
--- 7. 桌台表 (biz_table)
+-- 7. 折扣设置表 (biz_discount)
+-- 说明：默认插入两个折扣示例
+-- =============================================
+INSERT INTO `biz_discount` (id, name, type, discount_rate, min_amount, status, sort, description, created_at, updated_at, deleted_at) VALUES
+(UUID(), '全场9折', 1, 0.900, NULL, 1, 1, '全场通用9折优惠', UNIX_TIMESTAMP(NOW()) * 1000, UNIX_TIMESTAMP(NOW()) * 1000, 0),
+(UUID(), '全场8折', 1, 0.800, NULL, 0, 2, '全场通用8折优惠', UNIX_TIMESTAMP(NOW()) * 1000, UNIX_TIMESTAMP(NOW()) * 1000, 0);
+
+-- =============================================
+-- 8. 桌台表 (biz_table)
 -- 说明：默认创建20个桌台，分配到"大厅"分类
 -- =============================================
 INSERT INTO `biz_table` (id, name, category_id, status, current_order_id, start_time, preset_duration, pause_accumulated, last_pause_time, reminded, remind_ignored, created_at, updated_at, reservation_status, reservation_end_time, reservation_name, reservation_phone) VALUES
@@ -191,4 +201,9 @@ UNION ALL
 SELECT
   '会员等级',
   COUNT(*)
-FROM biz_member_level;
+FROM biz_member_level
+UNION ALL
+SELECT
+  '折扣',
+  COUNT(*)
+FROM biz_discount;

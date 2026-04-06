@@ -204,6 +204,47 @@
         <span class="duration-preview">{{ extensionPreview }}</span>
       </el-form-item>
 
+      <!-- 活动折扣 -->
+      <el-form-item label="活动折扣">
+        <el-checkbox v-model="form.applyActivityDiscount" @change="handleActivityDiscountChange">
+          应用活动折扣
+        </el-checkbox>
+      </el-form-item>
+
+      <!-- 折扣选择 -->
+      <el-form-item v-if="form.applyActivityDiscount" label="选择折扣" required>
+        <el-select
+          v-model="form.discountId"
+          placeholder="请选择折扣"
+          style="width: 100%"
+          @change="handleDiscountChange"
+        >
+          <el-option
+            v-for="discount in availableDiscounts"
+            :key="discount.id"
+            :label="formatDiscountLabel(discount)"
+            :value="discount.id"
+          >
+            <div class="discount-option">
+              <span class="discount-name">{{ discount.name }}</span>
+              <span class="discount-type">{{ discount.typeName }}</span>
+              <span class="discount-rate">{{ (discount.discountRate * 10).toFixed(1) }}折</span>
+            </div>
+          </el-option>
+        </el-select>
+        <div v-if="selectedDiscount" class="selected-discount-info">
+          <span v-if="selectedDiscount.minAmount" class="discount-condition">
+            满¥{{ selectedDiscount.minAmount }}可用
+          </span>
+          <span v-if="selectedDiscount.maxDiscount" class="discount-condition">
+            最高优惠¥{{ selectedDiscount.maxDiscount }}
+          </span>
+          <span v-if="selectedDiscount.description" class="discount-desc">
+            {{ selectedDiscount.description }}
+          </span>
+        </div>
+      </el-form-item>
+
       <!-- 备注 -->
       <el-form-item label="备注">
         <el-input
@@ -242,6 +283,7 @@ import type { FormInstance } from 'element-plus'
 import type { TableInfo } from '@/api/table'
 import { extendTable, NON_MEMBER_PAYMENT_METHODS, MEMBER_PAYMENT_METHODS, type PaymentMethod } from '@/api/table'
 import { getBillingRuleConfig, type BillingRule, type BillingRuleItem } from '@/api/config'
+import { getActiveDiscounts, calculateDiscountById, type DiscountInfo } from '@/api/discount'
 import type { MemberInfo } from '@/api/member'
 import MemberSelectDialog from '@/components/MemberSelectDialog.vue'
 
@@ -269,6 +311,10 @@ const isInitializing = ref(false)
 const isMember = ref(false)
 const selectedMember = ref<MemberInfo | null>(null)
 const memberDialogVisible = ref(false)
+
+// 活动折扣相关
+const availableDiscounts = ref<DiscountInfo[]>([])
+const selectedDiscount = ref<DiscountInfo | null>(null)
 
 // 支付方式
 const selectedPaymentMethod = ref<PaymentMethod>('offline')
@@ -321,7 +367,9 @@ const isMemberLocked = computed(() => {
 // 表单数据
 const form = ref({
   additionalDuration: 0, // 秒
-  remark: ''
+  remark: '',
+  applyActivityDiscount: false, // 是否应用活动折扣
+  discountId: '' // 选择的折扣ID
 })
 
 // 计费规则数据
@@ -455,7 +503,15 @@ const extendOriginalPrice = computed(() => {
 })
 
 // 续费折后价
+const extendFinalAmount = ref<number>(0) // 活动折扣计算的续费折后价
+
 const extendFinalPrice = computed(() => {
+  // 如果有活动折扣计算结果，优先使用
+  if (form.value.applyActivityDiscount && extendFinalAmount.value > 0) {
+    return extendFinalAmount.value
+  }
+
+  // 否则使用会员折扣
   if (selectedMember.value && memberDiscount.value > 0) {
     return extendOriginalPrice.value * memberDiscount.value
   }
@@ -467,8 +523,13 @@ const totalOriginalAmount = computed(() => {
   return currentOrderOriginalAmount.value + extendOriginalPrice.value
 })
 
-// 总折后价（对总原价计算会员折扣）
+// 总折后价
 const totalFinalAmount = computed(() => {
+  // 如果有活动折扣计算结果，使用：当前订单已付 + 续费折后价
+  if (form.value.applyActivityDiscount && extendFinalAmount.value > 0) {
+    return (currentOrderAmount.value || 0) + extendFinalAmount.value
+  }
+  // 否则使用会员折扣
   if (selectedMember.value && memberDiscount.value > 0) {
     return totalOriginalAmount.value * memberDiscount.value
   }
@@ -584,8 +645,15 @@ const initializeForm = () => {
 
   form.value = {
     additionalDuration: 0,
-    remark: ''
+    remark: '',
+    applyActivityDiscount: false,
+    discountId: ''
   }
+
+  // 重置折扣相关
+  availableDiscounts.value = []
+  selectedDiscount.value = null
+  extendFinalAmount.value = 0
 
   // 初始化会员信息
   isMember.value = false
@@ -654,12 +722,19 @@ const handleClose = () => {
 const resetForm = () => {
   form.value = {
     additionalDuration: 0,
-    remark: ''
+    remark: '',
+    applyActivityDiscount: false,
+    discountId: ''
   }
 
   // 重置会员选择
   isMember.value = false
   selectedMember.value = null
+
+  // 重置折扣相关
+  availableDiscounts.value = []
+  selectedDiscount.value = null
+  extendFinalAmount.value = 0
 
   // 如果桌台已有会员信息，自动设置会员（锁定状态）
   if (props.table?.memberId && props.table?.memberName) {
@@ -753,7 +828,8 @@ const handleConfirm = async () => {
       additionalDuration,
       channel: selectedChannel.value,
       memberId: selectedMember.value?.id,
-      paymentMethod: selectedPaymentMethod.value
+      paymentMethod: selectedPaymentMethod.value,
+      discountId: form.value.applyActivityDiscount ? form.value.discountId : undefined
     })
 
     ElMessage.success('续费成功')
@@ -812,6 +888,102 @@ const showMemberDialog = () => {
 const handleMemberSelected = (member: MemberInfo) => {
   selectedMember.value = member
   ElMessage.success(`已选择会员：${member.name}`)
+  // 刷新折扣列表（因为会员等级变化了）
+  if (form.value.applyActivityDiscount) {
+    loadDiscounts()
+  }
+}
+
+// 活动折扣切换处理
+const handleActivityDiscountChange = (val: string | number | boolean) => {
+  const checked = val === true || val === 'true'
+  if (checked) {
+    form.value.discountId = ''
+    selectedDiscount.value = null
+    extendFinalAmount.value = 0
+    loadDiscounts()
+  } else {
+    form.value.discountId = ''
+    selectedDiscount.value = null
+    availableDiscounts.value = []
+    extendFinalAmount.value = 0
+  }
+}
+
+// 折扣选择变化处理
+const handleDiscountChange = async (discountId: string) => {
+  const discount = availableDiscounts.value.find(d => d.id === discountId)
+  if (!discount) return
+  selectedDiscount.value = discount
+
+  // 计算总原价（当前订单 + 续费）
+  const totalOriginalAmount = currentOrderOriginalAmount.value + (extendOriginalPrice.value || 0)
+
+  // 如果选择了折扣且有总原价，调用API计算折扣
+  if (discount && totalOriginalAmount > 0) {
+    try {
+      const response = await calculateDiscountById(discountId, totalOriginalAmount, selectedMember.value?.id)
+
+      if (response && response.finalAmount !== undefined) {
+        // 计算续费后的折后价
+        const currentOrderPaid = currentOrderAmount.value || 0
+        const totalDiscounted = response.finalAmount
+
+        // 续费部分的折后价 = 总折后价 - 当前订单已付部分
+        let extendFinalValue = totalDiscounted - currentOrderPaid
+        if (extendFinalValue < 0) extendFinalValue = 0
+
+        // 更新续费折后价显示
+        extendFinalAmount.value = extendFinalValue
+
+        console.log('续费折扣计算成功: totalOriginal={}, totalFinalAmount={}, extendFinalAmount={}',
+          totalOriginalAmount, response.finalAmount, extendFinalValue)
+      }
+    } catch (error: any) {
+      console.error('计算续费折扣失败', error)
+      // 恢复原价
+      extendFinalAmount.value = extendOriginalPrice.value || 0
+    }
+  } else {
+    // 未选择折扣，恢复原价
+    extendFinalAmount.value = extendOriginalPrice.value || 0
+  }
+}
+
+// 加载折扣列表
+const loadDiscounts = async () => {
+  try {
+    const discounts = await getActiveDiscounts()
+    // 根据会员等级过滤折扣
+    let filteredDiscounts = discounts
+
+    if (selectedMember.value) {
+      // 有会员：显示所有折扣（固定折扣、活动折扣、匹配的会员折扣）
+      filteredDiscounts = discounts.filter(d => {
+        if (d.type === 2) { // 会员折扣
+          return d.memberLevelId === selectedMember.value?.levelId
+        }
+        return true
+      })
+    } else {
+      // 无会员：只显示固定折扣和活动折扣，过滤掉会员折扣
+      filteredDiscounts = discounts.filter(d => d.type !== 2)
+    }
+
+    availableDiscounts.value = filteredDiscounts
+
+    if (filteredDiscounts.length === 0) {
+      ElMessage.warning('暂无可用折扣')
+    }
+  } catch (error: any) {
+    console.error('加载折扣列表失败', error)
+    ElMessage.error('加载折扣列表失败')
+  }
+}
+
+// 格式化折扣选项标签
+const formatDiscountLabel = (discount: DiscountInfo) => {
+  return `${discount.name} - ${(discount.discountRate * 10).toFixed(1)}折`
 }
 </script>
 
@@ -1224,5 +1396,57 @@ const handleMemberSelected = (member: MemberInfo) => {
   font-weight: 600;
   color: #409eff;
   margin-left: 4px;
+}
+
+/* 折扣相关样式 */
+.discount-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.discount-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.discount-type {
+  font-size: 12px;
+  color: #909399;
+}
+
+.discount-rate {
+  font-weight: 600;
+  color: #f56c6c;
+}
+
+.selected-discount-info {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.discount-condition {
+  font-size: 12px;
+  color: #67c23a;
+  padding: 2px 8px;
+  background: #f0f9ff;
+  border-radius: 4px;
+}
+
+.discount-desc {
+  font-size: 12px;
+  color: #909399;
+}
+
+.discount-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

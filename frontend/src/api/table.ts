@@ -88,6 +88,7 @@ export interface StartTableParams {
   memberId?: number  // 会员ID
   remark?: string
   paymentMethod?: PaymentMethod  // 支付方式
+  discountId?: string  // 活动折扣ID
 }
 
 /**
@@ -232,6 +233,7 @@ export interface ExtendTableParams {
   channel?: string  // 订餐渠道
   memberId?: number  // 会员ID
   paymentMethod?: PaymentMethod  // 支付方式
+  discountId?: string  // 活动折扣ID
 }
 
 /**

@@ -1,1 +1,0 @@
-import{h as i}from"./index-DNGtqLKe.js";const s=()=>i.get("/config/billing"),g=s=>i.put("/config/billing",s),n=()=>i.get("/config/remind"),t=s=>i.put("/config/remind",s),o=()=>i.get("/config/system"),e=s=>i.put("/config/system",s);export{s as a,n as b,t as c,e as d,o as g,g as u};
