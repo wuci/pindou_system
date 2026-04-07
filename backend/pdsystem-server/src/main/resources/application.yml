@@ -78,7 +78,7 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     cache-enabled: false
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 已关闭SQL日志打印
 
 # JWT配置
 jwt:
@@ -90,8 +90,8 @@ jwt:
 # 日志配置
 logging:
   level:
-    com.pindou.timer: debug
-    com.pindou.timer.mapper: debug
+    com.pindou.timer: info
+    com.pindou.timer.mapper: info
   pattern:
     console: '%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{50} - %msg%n'
   file:

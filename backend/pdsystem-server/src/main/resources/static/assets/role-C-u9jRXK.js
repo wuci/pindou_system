@@ -1,0 +1,1 @@
+import{h as s}from"./index-C20UvrGJ.js";const e=e=>s.get("/roles",{params:e}),a=()=>s.get("/roles/all"),o=e=>s.post("/roles",e),r=e=>s.put("/roles",e),l=e=>s.delete(`/roles/${e}`);export{e as a,o as c,l as d,a as g,r as u};

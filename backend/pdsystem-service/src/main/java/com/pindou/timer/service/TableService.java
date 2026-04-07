@@ -25,9 +25,11 @@ public interface TableService {
      * @param status 状态筛选（可选）
      * @param categoryId 分类ID筛选（可选）
      * @param name 桌台名称模糊搜索（可选）
+     * @param isOvertime 是否已超时（可选，true=只查已超时的）
+     * @param remainingMinutes 剩余多少分钟内到期（可选）
      * @return 桌台信息列表
      */
-    List<TableInfoResponse> getTableList(String status, Long categoryId, String name);
+    List<TableInfoResponse> getTableList(String status, Long categoryId, String name, Boolean isOvertime, Integer remainingMinutes);
 
     /**
      * 更新桌台信息

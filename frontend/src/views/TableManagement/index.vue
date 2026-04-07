@@ -17,6 +17,27 @@
               @input="handleSearch"
               @clear="handleSearch"
             />
+            <!-- 已超时筛选 -->
+            <el-checkbox
+              v-model="isOvertime"
+              size="small"
+              style="margin-right: 8px"
+              @change="handleSearch"
+            >
+              已超时
+            </el-checkbox>
+            <!-- 剩余分钟数筛选 -->
+            <el-input-number
+              v-model="remainingMinutes"
+              placeholder="剩余分钟"
+              :min="1"
+              :max="999"
+              size="small"
+              style="width: 130px; margin-right: 8px"
+              controls-position="right"
+              @change="handleSearch"
+            />
+            <span style="font-size: 13px; color: #909399; margin-right: 12px">分钟内到期</span>
             <!-- 批量操作按钮 -->
             <template v-if="batchSelectionMode">
               <span class="selected-count">已选择 {{ selectedTableIds.size }} 个桌台</span>
@@ -184,6 +205,9 @@ const showConfigDialog = ref(false)
 const showEditDialog = ref(false)
 const showCategoryDialog = ref(false)
 const searchKeyword = ref('')
+// 查询条件
+const isOvertime = ref(false)
+const remainingMinutes = ref<number | null>(null)
 
 // 图标组件映射
 const iconMap: Record<string, Component> = {
@@ -214,7 +238,13 @@ const loadCategories = async () => {
 const loadTables = async () => {
   try {
     loading.value = true
-    const data = await getTableList('', currentCategory.value, searchKeyword.value)
+    const data = await getTableList(
+      '',
+      currentCategory.value,
+      searchKeyword.value,
+      isOvertime.value || undefined,
+      remainingMinutes.value || undefined
+    )
     tables.value = data
   } catch (error) {
   } finally {

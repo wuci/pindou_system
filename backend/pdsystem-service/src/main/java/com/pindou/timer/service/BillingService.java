@@ -37,6 +37,14 @@ public interface BillingService {
     AmountDetail calculateAmount(String channel, Integer actualDuration, Integer presetDuration);
 
     /**
+     * 获取不限时套餐价格
+     *
+     * @param channel 渠道代码
+     * @return 不限时套餐价格，如果不存在返回null
+     */
+    Double getUnlimitedPrice(String channel);
+
+    /**
      * 计算订单金额
      *
      * @param orderId 订单ID

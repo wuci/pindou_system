@@ -50,11 +50,14 @@ public class TableController extends ETSBaseController {
     public Result<List<TableInfoResponse>> getTableList(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String name) {
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Boolean isOvertime,
+            @RequestParam(required = false) Integer remainingMinutes) {
 
-        log.info("获取桌台列表请求: status={}, categoryId={}, name={}", status, categoryId, name);
+        log.info("获取桌台列表请求: status={}, categoryId={}, name={}, isOvertime={}, remainingMinutes={}",
+                status, categoryId, name, isOvertime, remainingMinutes);
 
-        List<TableInfoResponse> tables = tableService.getTableList(status, categoryId, name);
+        List<TableInfoResponse> tables = tableService.getTableList(status, categoryId, name, isOvertime, remainingMinutes);
 
         return Result.success(tables);
     }

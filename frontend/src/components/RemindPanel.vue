@@ -5,9 +5,9 @@
       <div class="marquee-content">
         <el-icon class="bell-icon"><Bell /></el-icon>
         <div class="marquee-wrapper">
-          <div class="marquee-text" :class="{ animating: marqueeReminds.length > 0 }">
+          <div class="marquee-text" :class="{ animating: marqueeReminds.length > 0 }" :style="{ animationDuration: marqueeAnimationDuration + 's' }">
             <span v-for="(remind, index) in displayReminds" :key="index" class="marquee-item">
-              【{{ remind.remindTypeDesc }}】{{ remind.tableName }} - {{ formatDuration(remind.usedDuration) }}
+              【{{ remind.remindTypeDesc }}】{{ remind.tableName }} - 超时{{ formatDuration(remind.overtimeDuration) }}
             </span>
           </div>
         </div>
@@ -48,7 +48,7 @@
                 </div>
               </div>
               <div class="item-right">
-                <span class="time-text">{{ formatDuration(remind.usedDuration) }}</span>
+                <span class="time-text">超时{{ formatDuration(remind.overtimeDuration) }}</span>
                 <el-icon class="close-btn"><Close /></el-icon>
               </div>
             </div>
@@ -99,6 +99,14 @@ const displayReminds = computed(() => {
   return marqueeReminds.value
 })
 
+// 根据内容数量动态计算跑马灯动画时长（每个提醒约5秒）
+const marqueeAnimationDuration = computed(() => {
+  const count = marqueeReminds.value.length
+  if (count === 0) return 0
+  // 基础时长 + 每个提醒5秒
+  return Math.max(30, count * 5)
+})
+
 // 打开面板
 const open = () => {
   isOpen.value = true
@@ -146,8 +154,8 @@ const loadReminders = async () => {
     // 更新未读数量
     emit('update:count', remindList.value.length)
 
-    // 更新跑马灯数据（只显示超时的，最多3个）
-    marqueeReminds.value = remindList.value.filter(r => r.remindType === 'timeout').slice(0, 3)
+    // 更新跑马灯数据（只显示超时的）
+    marqueeReminds.value = remindList.value.filter(r => r.remindType === 'timeout')
 
     // 通知父组件
     emit('remind', remindList.value)
@@ -385,7 +393,7 @@ export default {
 }
 
 .marquee-text.animating {
-  animation: marquee 20s linear infinite;
+  animation: marquee 60s linear infinite;
 }
 
 @keyframes marquee {

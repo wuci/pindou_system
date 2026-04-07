@@ -10,6 +10,7 @@ import com.pindou.timer.constants.TableConstants;
 import com.pindou.timer.dto.*;
 import com.pindou.timer.entity.*;
 import com.pindou.timer.event.TableStatusChangeEvent;
+import com.pindou.timer.mapper.MemberLevelMapper;
 import com.pindou.timer.mapper.MemberMapper;
 import com.pindou.timer.mapper.OrderMapper;
 import com.pindou.timer.mapper.TableMapper;
@@ -46,6 +47,9 @@ public class TableServiceImpl implements TableService {
     private MemberMapper memberMapper;
 
     @Autowired
+    private MemberLevelMapper memberLevelMapper;
+
+    @Autowired
     private ConsumptionRecordMapper consumptionRecordMapper;
 
     @Autowired
@@ -76,18 +80,171 @@ public class TableServiceImpl implements TableService {
     private DiscountRecordService discountRecordService;
 
     @Override
-    public List<TableInfoResponse> getTableList(String status, Long categoryId, String name) {
-        log.info("获取桌台列表: status={}, categoryId={}, name={}", status, categoryId, name);
+    public List<TableInfoResponse> getTableList(String status, Long categoryId, String name, Boolean isOvertime, Integer remainingMinutes) {
+        long startTime = System.currentTimeMillis();
+        log.info("获取桌台列表: status={}, categoryId={}, name={}, isOvertime={}, remainingMinutes={}",
+                status, categoryId, name, isOvertime, remainingMinutes);
 
+        long queryStart = System.currentTimeMillis();
         LambdaQueryWrapper<Table> wrapper = buildTableQueryWrapper(status, categoryId, name);
         List<Table> tables = tableMapper.selectList(wrapper);
+        log.info("查询桌台数据耗时: {}ms, count={}", System.currentTimeMillis() - queryStart, tables.size());
 
+        // 预加载配置（避免每个台台都查询一次）
+        long preloadConfigStart = System.currentTimeMillis();
+        int extendTimeMinutes = getExtendTimeConfig();
+        log.info("预加载配置耗时: {}ms", System.currentTimeMillis() - preloadConfigStart);
+
+        // 批量预加载数据，优化性能
+        long preloadStart = System.currentTimeMillis();
+        java.util.Map<String, Order> orderMap = preloadOrders(tables);
+        java.util.Map<Long, Member> memberMap = preloadMembers(orderMap);
+        java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
+        log.info("批量预加载耗时: {}ms (orders={}, members={}, levels={})",
+                System.currentTimeMillis() - preloadStart, orderMap.size(), memberMap.size(), memberLevelMap.size());
+
+        // 转换为响应对象
+        long convertStart = System.currentTimeMillis();
+        final int finalExtendTimeMinutes = extendTimeMinutes;
         List<TableInfoResponse> responses = tables.stream()
-                .map(this::convertToResponse)
+                .map(table -> convertToResponse(table, orderMap, memberMap, memberLevelMap, finalExtendTimeMinutes))
+                .collect(Collectors.toList());
+        log.info("转换响应对象耗时: {}ms", System.currentTimeMillis() - convertStart);
+
+        // 根据超时和剩余时间条件过滤
+        if (isOvertime != null && isOvertime) {
+            responses = responses.stream()
+                    .filter(this::isOvertime)
+                    .collect(Collectors.toList());
+        }
+
+        if (remainingMinutes != null && remainingMinutes > 0) {
+            final long currentTime = System.currentTimeMillis();
+            final long remainingMillis = remainingMinutes * 60 * 1000L;
+            responses = responses.stream()
+                    .filter(r -> willExpireWithin(r, currentTime, remainingMillis))
+                    .collect(Collectors.toList());
+        }
+
+        long endTime = System.currentTimeMillis();
+        log.info("获取桌台列表成功: count={},耗时={}ms", responses.size(), endTime - startTime);
+        return responses;
+    }
+
+    /**
+     * 批量预加载订单数据
+     *
+     * @param tables 桌台列表
+     * @return 订单ID -> 订单的映射
+     */
+    private java.util.Map<String, Order> preloadOrders(List<Table> tables) {
+        // 收集所有订单ID
+        List<String> orderIds = tables.stream()
+                .map(Table::getCurrentOrderId)
+                .filter(id -> id != null && !id.isEmpty())
+                .distinct()
                 .collect(Collectors.toList());
 
-        log.info("获取桌台列表成功: count={}", responses.size());
-        return responses;
+        if (orderIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询订单
+        List<Order> orders = orderMapper.selectBatchIds(orderIds);
+        return orders.stream().collect(Collectors.toMap(Order::getId, o -> o, (a, b) -> a));
+    }
+
+    /**
+     * 批量预加载会员数据
+     *
+     * @param orderMap 订单映射
+     * @return 会员ID -> 会员的映射
+     */
+    private java.util.Map<Long, Member> preloadMembers(java.util.Map<String, Order> orderMap) {
+        // 收集所有会员ID
+        List<Long> memberIds = orderMap.values().stream()
+                .map(Order::getMemberId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (memberIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询会员
+        List<Member> members = memberMapper.selectBatchIds(memberIds);
+        return members.stream().collect(Collectors.toMap(Member::getId, m -> m, (a, b) -> a));
+    }
+
+    /**
+     * 批量预加载会员等级数据
+     *
+     * @param memberMap 会员映射
+     * @return 等级ID -> 等级的映射
+     */
+    private java.util.Map<Long, MemberLevel> preloadMemberLevels(java.util.Map<Long, Member> memberMap) {
+        // 收集所有等级ID
+        List<Long> levelIds = memberMap.values().stream()
+                .map(Member::getLevelId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (levelIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询会员等级
+        List<MemberLevel> levels = memberLevelMapper.selectBatchIds(levelIds);
+        return levels.stream().collect(Collectors.toMap(MemberLevel::getId, l -> l, (a, b) -> a));
+    }
+
+    /**
+     * 判断桌台是否已超时
+     *
+     * @param response 桌台响应信息
+     * @return true-已超时 false-未超时
+     */
+    private boolean isOvertime(TableInfoResponse response) {
+        // 只有使用中和暂停状态才能超时
+        if (!"using".equals(response.getStatus()) && !"paused".equals(response.getStatus())) {
+            return false;
+        }
+        // 不设时长的不会超时
+        if (response.getPresetDuration() == null) {
+            return false;
+        }
+        // 计算结束时间
+        long pauseDuration = response.getPauseDuration() != null ? response.getPauseDuration() : 0L;
+        long endTime = response.getStartTime() + response.getPresetDuration() * 1000L + pauseDuration * 1000L;
+        return System.currentTimeMillis() > endTime;
+    }
+
+    /**
+     * 判断桌台是否会在指定时间内到期
+     *
+     * @param response 桌台响应信息
+     * @param currentTime 当前时间（毫秒）
+     * @param remainingMillis 剩余时间毫秒数
+     * @return true-会在指定时间内到期 false-不会
+     */
+    private boolean willExpireWithin(TableInfoResponse response, long currentTime, long remainingMillis) {
+        // 只有使用中和暂停状态才会到期
+        if (!"using".equals(response.getStatus()) && !"paused".equals(response.getStatus())) {
+            return false;
+        }
+        // 不设时长的不会到期
+        if (response.getPresetDuration() == null) {
+            return false;
+        }
+        // 计算结束时间
+        long pauseDuration = response.getPauseDuration() != null ? response.getPauseDuration() : 0L;
+        long endTime = response.getStartTime() + response.getPresetDuration() * 1000L + pauseDuration * 1000L;
+        // 计算剩余时间
+        long remainingTime = endTime - currentTime;
+        // 剩余时间在指定范围内（大于0且小于等于指定时间）
+        return remainingTime > 0 && remainingTime <= remainingMillis;
     }
 
     /**
@@ -310,7 +467,18 @@ public class TableServiceImpl implements TableService {
         String discountId = null;
         BigDecimal discountRate = null;
 
-        if (presetDuration != null) {
+        // 不限时套餐：获取不限时套餐价格
+        if (request.getUnlimited() != null && request.getUnlimited()) {
+            String channel = request.getChannel() != null ? request.getChannel() : TableConstants.Channel.STORE;
+            Double unlimitedPrice = billingService.getUnlimitedPrice(channel);
+            if (unlimitedPrice != null) {
+                originalAmount = unlimitedPrice;
+                finalAmount = originalAmount;
+                log.info("使用不限时套餐价格: channel={}, unlimitedPrice={}", channel, unlimitedPrice);
+            }
+        }
+        // 限时套餐：按时长计算价格
+        else if (presetDuration != null) {
             String channel = request.getChannel() != null ? request.getChannel() : TableConstants.Channel.STORE;
             AmountDetail amountDetail = billingService.calculateAmount(channel, presetDuration, presetDuration);
             originalAmount = amountDetail.getTotalAmount();
@@ -501,14 +669,38 @@ public class TableServiceImpl implements TableService {
             extendChannel = TableConstants.Channel.STORE;
         }
 
-        AmountDetail extendAmountDetail = billingService.calculateAmount(
-                extendChannel,
-                request.getAdditionalDuration(),
-                request.getAdditionalDuration()
-        );
-        double extendFee = extendAmountDetail.getTotalAmount();
+        double extendFee = 0.0;
 
-        log.info("使用渠道 {} 计算续费费用: additionalDuration={}秒, extendFee={}", extendChannel, request.getAdditionalDuration(), extendFee);
+        // 如果续费时长为0，说明是选择不限时套餐
+        if (request.getAdditionalDuration() == 0) {
+            // 获取不限时套餐价格
+            Double unlimitedPrice = billingService.getUnlimitedPrice(extendChannel);
+            if (unlimitedPrice != null) {
+                // 如果当前订单已经是不限时套餐，续费不限时套餐价格为0（无意义）
+                if (order.getPresetDuration() == null) {
+                    log.warn("当前已是不限时套餐，无需续费不限时套餐");
+                    extendFee = 0.0;
+                } else {
+                    // 从限时套餐改为不限时套餐：用不限时价格减去当前价格
+                    double currentAmount = order.getOriginalAmount() != null ? order.getOriginalAmount().doubleValue() : 0.0;
+                    extendFee = Math.max(0, unlimitedPrice - currentAmount);
+                    log.info("从限时套餐改为不限时套餐: currentAmount={}, unlimitedPrice={}, extendFee={}",
+                            currentAmount, unlimitedPrice, extendFee);
+                }
+            } else {
+                log.warn("未找到不限时套餐价格，续费时长为0时无法计算费用");
+                extendFee = 0.0;
+            }
+        } else {
+            // 普通续费：按时长计算
+            AmountDetail extendAmountDetail = billingService.calculateAmount(
+                    extendChannel,
+                    request.getAdditionalDuration(),
+                    request.getAdditionalDuration()
+            );
+            extendFee = extendAmountDetail.getTotalAmount();
+            log.info("使用渠道 {} 计算续费费用: additionalDuration={}秒, extendFee={}", extendChannel, request.getAdditionalDuration(), extendFee);
+        }
 
         double currentAmount = order.getAmount() != null ? order.getAmount().doubleValue() : 0.0;
         double currentOriginalAmount = order.getOriginalAmount() != null ? order.getOriginalAmount().doubleValue() : 0.0;
@@ -525,8 +717,8 @@ public class TableServiceImpl implements TableService {
 
         Integer currentPresetDuration = order.getPresetDuration();
         Integer newPresetDuration = currentPresetDuration == null
-                ? request.getAdditionalDuration()
-                : currentPresetDuration + request.getAdditionalDuration();
+                ? (request.getAdditionalDuration() == 0 ? null : request.getAdditionalDuration())
+                : (request.getAdditionalDuration() == 0 ? null : currentPresetDuration + request.getAdditionalDuration());
 
         return new ExtendCalculationResult(newOriginalAmount, newTotalAmount, newPresetDuration,
                 discountCalc.getDiscountId(), discountCalc.getDiscountRate());
@@ -1114,7 +1306,61 @@ public class TableServiceImpl implements TableService {
     }
 
     /**
-     * 转换为响应DTO
+     * 转换为响应DTO（使用预加载的数据，批量查询优化）
+     */
+    private TableInfoResponse convertToResponse(Table table,
+                                                   java.util.Map<String, Order> orderMap,
+                                                   java.util.Map<Long, Member> memberMap,
+                                                   java.util.Map<Long, MemberLevel> memberLevelMap,
+                                                   int extendTimeMinutes) {
+        TableInfoResponse response = new TableInfoResponse();
+        response.setId(table.getId());
+        response.setName(table.getName());
+        response.setStatus(table.getStatus());
+        response.setCategoryId(table.getCategoryId());
+        response.setCurrentOrderId(table.getCurrentOrderId());
+        response.setStartTime(table.getStartTime());
+        response.setPresetDuration(table.getPresetDuration());
+        response.setReminded(table.getReminded());
+        response.setRemindIgnored(table.getRemindIgnored());
+        response.setReservationStatus(table.getReservationStatus());
+        response.setReservationEndTime(table.getReservationEndTime());
+        response.setReservationName(table.getReservationName());
+        response.setReservationPhone(table.getReservationPhone());
+        response.setCreatedAt(table.getCreatedAt());
+
+        // 计算到点时间（使用预加载的配置，避免重复查询）
+        if (table.getStartTime() != null && table.getPresetDuration() != null) {
+            long baseEndTime = table.getStartTime() + table.getPresetDuration() * 1000L;
+            long endTime = baseEndTime + extendTimeMinutes * 60 * 1000L;
+            response.setEndTime(endTime);
+        }
+
+        // 计算时长和费用
+        if (TableConstants.isInUse(table.getStatus())) {
+            fillDurationAndAmount(response, table, orderMap, memberMap, memberLevelMap);
+        } else {
+            response.setDuration(0L);
+            response.setPauseDuration(0L);
+            response.setAmount(0.0);
+        }
+
+        return response;
+    }
+
+    /**
+     * 转换为响应DTO（兼容其他方法调用）
+     */
+    private TableInfoResponse convertToResponse(Table table,
+                                                   java.util.Map<String, Order> orderMap,
+                                                   java.util.Map<Long, Member> memberMap,
+                                                   java.util.Map<Long, MemberLevel> memberLevelMap) {
+        // 调用带参数的版本
+        return convertToResponse(table, orderMap, memberMap, memberLevelMap, getExtendTimeConfig());
+    }
+
+    /**
+     * 转换为响应DTO（兼容其他方法调用）
      */
     private TableInfoResponse convertToResponse(Table table) {
         TableInfoResponse response = new TableInfoResponse();
@@ -1154,7 +1400,50 @@ public class TableServiceImpl implements TableService {
     }
 
     /**
-     * 填充时长和费用信息
+     * 填充时长和费用信息（使用预加载数据，批量查询优化）
+     */
+    private void fillDurationAndAmount(TableInfoResponse response, Table table,
+                                         java.util.Map<String, Order> orderMap,
+                                         java.util.Map<Long, Member> memberMap,
+                                         java.util.Map<Long, MemberLevel> memberLevelMap) {
+        long now = System.currentTimeMillis();
+        long start = table.getStartTime();
+        long totalElapsed = (now - start) / 1000;
+
+        long pauseDuration = table.getPauseAccumulated();
+        if (TableConstants.Status.PAUSED.equals(table.getStatus()) && table.getLastPauseTime() != null) {
+            pauseDuration += (now - table.getLastPauseTime()) / 1000;
+        }
+
+        long duration = totalElapsed - pauseDuration;
+        response.setDuration(duration);
+        response.setPauseDuration(pauseDuration);
+
+        if (table.getCurrentOrderId() != null) {
+            Order currentOrder = orderMap.get(table.getCurrentOrderId());
+            if (currentOrder != null) {
+                response.setChannel(currentOrder.getChannel());
+
+                if (currentOrder.getAmount() != null && currentOrder.getAmount().doubleValue() > 0) {
+                    response.setAmount(currentOrder.getAmount().doubleValue());
+                    if (currentOrder.getOriginalAmount() != null && currentOrder.getOriginalAmount().doubleValue() > 0) {
+                        response.setOriginalAmount(currentOrder.getOriginalAmount().doubleValue());
+                    }
+                    fillOrderMemberInfo(response, currentOrder, memberMap, memberLevelMap);
+                    fillOrderPaymentInfo(response, currentOrder);
+                } else {
+                    calculateAndSetAmount(response, table, currentOrder, (int) duration);
+                }
+            }
+        } else {
+            AmountDetail amountDetail = billingService.calculateAmount(TableConstants.Channel.STORE, (int) duration, table.getPresetDuration());
+            response.setAmount(amountDetail.getTotalAmount());
+            response.setOriginalAmount(amountDetail.getTotalAmount());
+        }
+    }
+
+    /**
+     * 填充时长和费用信息（兼容其他方法调用）
      */
     private void fillDurationAndAmount(TableInfoResponse response, Table table) {
         long now = System.currentTimeMillis();
@@ -1194,7 +1483,31 @@ public class TableServiceImpl implements TableService {
     }
 
     /**
-     * 填充订单会员信息
+     * 填充订单会员信息（使用预加载数据，批量查询优化）
+     */
+    private void fillOrderMemberInfo(TableInfoResponse response, Order order,
+                                       java.util.Map<Long, Member> memberMap,
+                                       java.util.Map<Long, MemberLevel> memberLevelMap) {
+        if (order.getMemberId() != null) {
+            response.setMemberId(order.getMemberId());
+            Member member = memberMap.get(order.getMemberId());
+            if (member != null) {
+                response.setMemberName(member.getName());
+                if (member.getLevelId() != null) {
+                    MemberLevel memberLevel = memberLevelMap.get(member.getLevelId());
+                    if (memberLevel != null && memberLevel.getDiscountRate() != null) {
+                        response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
+                    }
+                }
+                if (member.getBalance() != null) {
+                    response.setMemberBalance(member.getBalance().doubleValue());
+                }
+            }
+        }
+    }
+
+    /**
+     * 填充订单会员信息（兼容其他方法调用）
      */
     private void fillOrderMemberInfo(TableInfoResponse response, Order order) {
         if (order.getMemberId() != null) {

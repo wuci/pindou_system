@@ -84,6 +84,7 @@ export interface TableInfo {
  */
 export interface StartTableParams {
   presetDuration: number | null
+  unlimited?: boolean  // 是否为不限时套餐
   channel?: string  // 订餐渠道
   memberId?: number  // 会员ID
   remark?: string
@@ -141,9 +142,9 @@ export interface BillInfo {
 /**
  * 获取桌台列表
  */
-export const getTableList = (status?: string, categoryId?: number, name?: string) => {
+export const getTableList = (status?: string, categoryId?: number, name?: string, isOvertime?: boolean, remainingMinutes?: number) => {
   return http.get<TableInfo[]>('/tables', {
-    params: { status, categoryId, name }
+    params: { status, categoryId, name, isOvertime, remainingMinutes }
   })
 }
 

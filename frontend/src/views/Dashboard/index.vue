@@ -37,7 +37,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-title">使用中桌台</div>
-              <div class="stat-value">{{ usingTableCount }} / {{ totalTableCount }}</div>
+              <div class="stat-value">{{ usingTableCount }} <span v-if="totalTableCount > 0">/ {{ totalTableCount }}</span></div>
             </div>
           </div>
         </el-card>
@@ -475,11 +475,14 @@ const loadDashboardData = async () => {
     // 获取所有桌台
     const tables = await getTableList()
 
-    // 桌台总数（实际存在的桌台数量）
-    totalTableCount.value = tables.length
+    // 只有成功获取到桌台数据时才更新统计
+    if (tables && tables.length >= 0) {
+      // 桌台总数（实际存在的桌台数量）
+      totalTableCount.value = tables.length
 
-    // 计算使用中的桌台数
-    usingTableCount.value = tables.filter((t: TableInfo) => t.status === 'using').length
+      // 计算使用中的桌台数
+      usingTableCount.value = tables.filter((t: TableInfo) => t.status === 'using').length
+    }
 
     // 获取当天已完成的订单
     const todayStart = new Date()
@@ -500,11 +503,13 @@ const loadDashboardData = async () => {
     // 今日订单数
     todayOrderCount.value = todayOrders.length
 
-    // 计算翻台率
+    // 计算翻台率（有桌台数据时才计算）
     if (totalTableCount.value > 0) {
       turnoverRate.value = Math.round((todayOrderCount.value / totalTableCount.value) * 100)
     }
   } catch (error) {
+    // 发生错误时不更新统计数据
+    console.error('加载工作台数据失败:', error)
   }
 }
 

@@ -11,6 +11,8 @@ import com.pindou.timer.dto.*;
 import com.pindou.timer.entity.Member;
 import com.pindou.timer.entity.MemberLevel;
 import com.pindou.timer.entity.Order;
+import com.pindou.timer.mapper.MemberLevelMapper;
+import com.pindou.timer.mapper.MemberMapper;
 import com.pindou.timer.mapper.OrderMapper;
 import com.pindou.timer.service.BillingService;
 import com.pindou.timer.service.MemberLevelService;
@@ -39,6 +41,12 @@ public class OrderServiceImpl implements OrderService {
     private OrderMapper orderMapper;
 
     @Resource
+    private MemberMapper memberMapper;
+
+    @Resource
+    private MemberLevelMapper memberLevelMapper;
+
+    @Resource
     private BillingService billingService;
 
     @Resource
@@ -56,6 +64,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public PageResult<OrderInfoResponse> getActiveOrders(Integer page, Integer pageSize) {
+        long startTime = System.currentTimeMillis();
         log.info("获取当天已完成订单列表: page={}, pageSize={}", page, pageSize);
 
         // 构建查询条件
@@ -72,9 +81,14 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> pageObj = new Page<>(page, pageSize);
         Page<Order> resultPage = orderMapper.selectPage(pageObj, wrapper);
 
+        // 批量预加载数据，优化性能
+        List<Order> orders = resultPage.getRecords();
+        java.util.Map<Long, Member> memberMap = preloadMembers(orders);
+        java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
+
         // 转换结果
-        List<OrderInfoResponse> records = resultPage.getRecords().stream()
-                .map(this::convertToInfoResponse)
+        List<OrderInfoResponse> records = orders.stream()
+                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap))
                 .collect(Collectors.toList());
 
         // 使用 PageResult.of 构建分页结果
@@ -85,8 +99,56 @@ public class OrderServiceImpl implements OrderService {
                 pageSize
         );
 
-        log.info("获取当天已完成订单列表成功: total={}, totalPages={}", pageResult.getTotal(), pageResult.getTotalPages());
+        long endTime = System.currentTimeMillis();
+        log.info("获取当天已完成订单列表成功: total={}, totalPages={},耗时={}ms",
+                pageResult.getTotal(), pageResult.getTotalPages(), endTime - startTime);
         return pageResult;
+    }
+
+    /**
+     * 批量预加载会员数据
+     *
+     * @param orders 订单列表
+     * @return 会员ID -> 会员的映射
+     */
+    private java.util.Map<Long, Member> preloadMembers(List<Order> orders) {
+        // 收集所有会员ID
+        List<Long> memberIds = orders.stream()
+                .map(Order::getMemberId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (memberIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询会员
+        List<Member> members = memberMapper.selectBatchIds(memberIds);
+        return members.stream().collect(Collectors.toMap(Member::getId, m -> m, (a, b) -> a));
+    }
+
+    /**
+     * 批量预加载会员等级数据
+     *
+     * @param memberMap 会员映射
+     * @return 等级ID -> 等级的映射
+     */
+    private java.util.Map<Long, MemberLevel> preloadMemberLevels(java.util.Map<Long, Member> memberMap) {
+        // 收集所有等级ID
+        List<Long> levelIds = memberMap.values().stream()
+                .map(Member::getLevelId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (levelIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询会员等级
+        List<MemberLevel> levels = memberLevelMapper.selectBatchIds(levelIds);
+        return levels.stream().collect(Collectors.toMap(MemberLevel::getId, l -> l, (a, b) -> a));
     }
 
     @Override
@@ -179,7 +241,81 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 转换为订单信息响应（列表用）
+     * 转换为订单信息响应（列表用，使用预加载数据）
+     */
+    private OrderInfoResponse convertToInfoResponse(Order order,
+                                                     java.util.Map<Long, Member> memberMap,
+                                                     java.util.Map<Long, MemberLevel> memberLevelMap) {
+        OrderInfoResponse response = new OrderInfoResponse();
+        response.setId(order.getId());
+        response.setOrderNo(order.getId());
+        response.setTableId(order.getTableId());
+        response.setTableName(order.getTableName());
+        response.setStartTime(order.getStartTime());
+        response.setEndTime(order.getEndTime());
+        response.setDuration(order.getDuration());
+        response.setPauseDuration(order.getPauseDuration());
+        response.setPresetDuration(order.getPresetDuration());
+        response.setChannel(order.getChannel());
+        response.setStatus(order.getStatus());
+        response.setOperatorName(order.getOperatorName());
+        response.setPaidAt(order.getPaidAt());
+        response.setCreatedAt(order.getCreatedAt());
+
+        // 设置会员ID
+        if (order.getMemberId() != null) {
+            response.setMemberId(order.getMemberId());
+        }
+
+        // 优先使用订单中存储的金额
+        if (order.getAmount() != null && order.getAmount().doubleValue() > 0) {
+            response.setAmount(order.getAmount().doubleValue());
+            if (order.getOriginalAmount() != null && order.getOriginalAmount().doubleValue() > 0) {
+                response.setOriginalAmount(order.getOriginalAmount().doubleValue());
+                double discountAmount = order.getOriginalAmount().doubleValue() - order.getAmount().doubleValue();
+                if (discountAmount > 0) {
+                    response.setDiscountAmount(discountAmount);
+                }
+            }
+        } else {
+            // 计算当前费用
+            int actualDuration = order.getDuration() - order.getPauseDuration();
+            String orderChannel = order.getChannel() != null ? order.getChannel() : "store";
+            AmountDetail amountDetail = billingService.calculateAmount(orderChannel, actualDuration, order.getPresetDuration());
+            response.setAmount(amountDetail.getTotalAmount());
+        }
+
+        // 填充会员信息（使用预加载数据）
+        if (order.getMemberId() != null) {
+            Member member = memberMap.get(order.getMemberId());
+            if (member != null) {
+                response.setMemberName(member.getName());
+                if (member.getLevelId() != null) {
+                    MemberLevel memberLevel = memberLevelMap.get(member.getLevelId());
+                    if (memberLevel != null) {
+                        response.setMemberLevelName(memberLevel.getName());
+                        if (memberLevel.getDiscountRate() != null) {
+                            response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 设置支付方式信息
+        if (order.getPaymentMethod() != null) {
+            response.setPaymentMethod(order.getPaymentMethod());
+            response.setBalanceAmount(order.getBalanceAmount() != null ?
+                order.getBalanceAmount().doubleValue() : null);
+            response.setOtherPaymentAmount(order.getOtherPaymentAmount() != null ?
+                order.getOtherPaymentAmount().doubleValue() : null);
+        }
+
+        return response;
+    }
+
+    /**
+     * 转换为订单信息响应（列表用，兼容其他方法调用）
      */
     private OrderInfoResponse convertToInfoResponse(Order order) {
         OrderInfoResponse response = new OrderInfoResponse();

@@ -211,7 +211,7 @@
         <el-button v-if="permissions.canPause" size="small" @click.stop="$emit('pause', table)">
           暂停
         </el-button>
-        <el-button v-if="permissions.canExtend" type="warning" size="small" @click.stop="$emit('extend', table)">
+        <el-button v-if="canShowExtend" type="warning" size="small" @click.stop="$emit('extend', table)">
           续费
         </el-button>
         <el-button v-if="permissions.canBill" type="success" size="small" @click.stop="$emit('end', table)">
@@ -222,7 +222,7 @@
         <el-button v-if="permissions.canPause" type="primary" size="small" @click.stop="$emit('resume', table)">
           继续
         </el-button>
-        <el-button v-if="permissions.canExtend" type="warning" size="small" @click.stop="$emit('extend', table)">
+        <el-button v-if="canShowExtend" type="warning" size="small" @click.stop="$emit('extend', table)">
           续费
         </el-button>
         <el-button v-if="permissions.canBill" type="success" size="small" @click.stop="$emit('end', table)">
@@ -249,14 +249,29 @@ import { useUserStore } from '@/stores/user'
 // 用户状态和权限
 const userStore = useUserStore()
 
+// 判断是否为不限时套餐（presetDuration 为 null、0 或 undefined 表示不限时）
+const isUnlimited = computed(() => {
+  return props.table.presetDuration === null || props.table.presetDuration === 0 || props.table.presetDuration === undefined
+})
+
+// 是否有续费权限
+const hasExtendPermission = computed(() => {
+  return userStore.hasPermission('table:extend')
+})
+
 const permissions = computed(() => ({
   canStart: userStore.hasPermission('table:start'),
   canPause: userStore.hasPermission('table:pause'),
   canEnd: userStore.hasPermission('table:end'),
-  canExtend: userStore.hasPermission('table:extend'),
+  canExtend: hasExtendPermission.value,
   canReserve: userStore.hasPermission('table:reserve'),
   canBill: userStore.hasPermission('table:bill')
 }))
+
+// 是否允许续费（有权限且不是不限时套餐）
+const canShowExtend = computed(() => {
+  return hasExtendPermission.value && !isUnlimited.value
+})
 
 interface Props {
   table: TableInfo

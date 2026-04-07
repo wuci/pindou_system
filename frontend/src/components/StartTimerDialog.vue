@@ -93,22 +93,22 @@
       </el-form-item>
 
       <!-- 当前选择的时长预览 -->
-      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="套餐时长">
+      <el-form-item v-if="!isSelectedRuleUnlimited" label="套餐时长">
         <span class="duration-preview">{{ durationPreview }}</span>
       </el-form-item>
 
       <!-- 延长时间（仅非不限时时显示） -->
-      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="延长时间">
+      <el-form-item v-if="!isSelectedRuleUnlimited" label="延长时间">
         <span class="extend-time-display">{{ formatExtendTime }}</span>
       </el-form-item>
 
       <!-- 总时长预览（仅非不限时时显示） -->
-      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="总时长">
+      <el-form-item v-if="!isSelectedRuleUnlimited" label="总时长">
         <span class="duration-preview total-preview">{{ totalDurationPreview }}</span>
       </el-form-item>
 
-      <!-- 费用信息（仅非不限时时显示） -->
-      <el-form-item v-if="selectedRuleIndex !== 'unlimited'" label="费用">
+      <!-- 费用信息（始终显示） -->
+      <el-form-item label="费用">
         <!-- 选择会员时：显示原价和折扣价 -->
         <div v-if="selectedMember" class="price-display-row">
           <div class="price-item-inline">
@@ -375,7 +375,7 @@ const formatRuleTime = (rule: BillingRuleItem): string => {
 
 // 时长预览
 const durationPreview = computed(() => {
-  if (selectedRuleIndex.value === 'unlimited') {
+  if (selectedRuleIndex.value === 'unlimited' || isSelectedRuleUnlimited.value) {
     return '不设时长'
   }
 
@@ -421,11 +421,18 @@ const formatExtendTime = computed(() => {
 // 会员折扣率（用于计算，可以被活动折扣覆盖）
 const memberDiscount = ref(1)
 
+// 当前选择的规则
+const currentSelectedRule = computed(() => {
+  if (typeof selectedRuleIndex.value === 'number') {
+    return currentRules.value[selectedRuleIndex.value]
+  }
+  return null
+})
+
 // 当前选择的价格
 const currentRulePrice = computed(() => {
-  if (typeof selectedRuleIndex.value === 'number') {
-    const rule = currentRules.value[selectedRuleIndex.value]
-    return rule?.price || 0
+  if (currentSelectedRule.value) {
+    return currentSelectedRule.value.price || 0
   }
   return 0
 })
@@ -433,6 +440,11 @@ const currentRulePrice = computed(() => {
 // 原价
 const originalPrice = computed(() => {
   return currentRulePrice.value
+})
+
+// 判断当前选择是否为不限时套餐
+const isSelectedRuleUnlimited = computed(() => {
+  return currentSelectedRule.value?.unlimited === true
 })
 
 // 折扣价（可以被活动折扣计算结果覆盖）
@@ -690,7 +702,7 @@ const initializeForm = () => {
 watch(
   [selectedRuleIndex, customHours, customMinutes],
   () => {
-    if (selectedRuleIndex.value === 'unlimited') {
+    if (selectedRuleIndex.value === 'unlimited' || isSelectedRuleUnlimited.value) {
       form.value.presetDuration = 0
     } else if (selectedRuleIndex.value === 'custom') {
       form.value.presetDuration = customHours.value * 3600 + customMinutes.value * 60
@@ -747,7 +759,7 @@ const handleConfirm = async () => {
   // 直接根据选择的规则计算套餐时长（不包含延长时间）
   let packageDuration = 0
 
-  if (selectedRuleIndex.value === 'unlimited') {
+  if (selectedRuleIndex.value === 'unlimited' || isSelectedRuleUnlimited.value) {
     packageDuration = 0
   } else if (selectedRuleIndex.value === 'custom') {
     packageDuration = customHours.value * 3600 + customMinutes.value * 60
@@ -789,6 +801,7 @@ const handleConfirm = async () => {
   try {
     await startTable(props.table.id, {
       presetDuration: packageDuration,  // 只传套餐时长，不包含延长时间
+      unlimited: isSelectedRuleUnlimited.value,  // 传递是否为不限时套餐
       channel: selectedChannel.value,
       memberId: selectedMember.value?.id,
       remark: form.value.remark,

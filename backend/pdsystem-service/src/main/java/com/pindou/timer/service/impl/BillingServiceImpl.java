@@ -35,6 +35,21 @@ public class BillingServiceImpl implements BillingService {
      */
     private static final Double DEFAULT_OVERTIME_RATE = 1.5;
 
+    /**
+     * 计费规则缓存（配置值）
+     */
+    private volatile String cachedBillingRuleConfig;
+
+    /**
+     * 计费规则缓存时间
+     */
+    private volatile long cacheTime;
+
+    /**
+     * 缓存过期时间（5分钟）
+     */
+    private static final long CACHE_EXPIRY_MS = 5 * 60 * 1000;
+
     @Resource
     private ConfigMapper configMapper;
 
@@ -262,6 +277,14 @@ public class BillingServiceImpl implements BillingService {
      * 获取计费规则配置
      */
     private String getBillingRuleConfig() {
+        // 检查缓存
+        String cached = cachedBillingRuleConfig;
+        long now = System.currentTimeMillis();
+        if (cached != null && (now - cacheTime) < CACHE_EXPIRY_MS) {
+            return cached;
+        }
+
+        // 缓存过期或不存在，重新加载
         LambdaQueryWrapper<Config> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Config::getConfigKey, BILLING_RULE_KEY);
         Config config = configMapper.selectOne(wrapper);
@@ -271,7 +294,21 @@ public class BillingServiceImpl implements BillingService {
             throw new BusinessException(com.pindou.timer.common.result.ErrorCode.CONFIG_NOT_FOUND, "计费规则配置不存在，请先在设置页面配置计费规则");
         }
 
-        return config.getConfigValue();
+        // 更新缓存
+        cachedBillingRuleConfig = config.getConfigValue();
+        cacheTime = now;
+
+        return cachedBillingRuleConfig;
+    }
+
+    /**
+     * 清除计费规则缓存
+     * 当配置更新时调用此方法
+     */
+    public void clearBillingRuleCache() {
+        cachedBillingRuleConfig = null;
+        cacheTime = 0;
+        log.info("计费规则缓存已清除");
     }
 
     /**
@@ -286,5 +323,54 @@ public class BillingServiceImpl implements BillingService {
         rule.setPricePerMinute(0.5);
         rule.setOvertimeRate(DEFAULT_OVERTIME_RATE);
         return rule;
+    }
+
+    @Override
+    public Double getUnlimitedPrice(String channel) {
+        log.info("获取不限时套餐价格: channel={}", channel);
+
+        try {
+            // 获取计费规则
+            String billingRuleConfig = getBillingRuleConfig();
+            JSONObject billingRuleJson = JSONUtil.parseObj(billingRuleConfig);
+
+            // 获取渠道列表
+            Object channelsObj = billingRuleJson.get("channels");
+            if (channelsObj == null) {
+                log.warn("计费规则中没有渠道配置");
+                return null;
+            }
+
+            // 查找指定渠道
+            for (Object channelObj : (Iterable) channelsObj) {
+                JSONObject channelJson = JSONUtil.parseObj(channelObj);
+                String channelCode = channelJson.getStr("channel");
+
+                if (channel != null && channel.equals(channelCode)) {
+                    // 找到指定渠道，查找不限时规则
+                    Object rulesObj = channelJson.get("rules");
+                    if (rulesObj != null) {
+                        for (Object ruleObj : (Iterable) rulesObj) {
+                            JSONObject rule = JSONUtil.parseObj(ruleObj);
+                            Boolean unlimited = rule.getBool("unlimited", false);
+
+                            if (Boolean.TRUE.equals(unlimited)) {
+                                Double price = rule.getDouble("price");
+                                log.info("找到不限时套餐价格: channel={}, price={}", channel, price);
+                                return price;
+                            }
+                        }
+                    }
+                    log.warn("渠道 {} 中没有不限时套餐", channel);
+                    return null;
+                }
+            }
+
+            log.warn("未找到渠道 {}", channel);
+            return null;
+        } catch (Exception e) {
+            log.error("获取不限时套餐价格失败: {}", e.getMessage(), e);
+            return null;
+        }
     }
 }

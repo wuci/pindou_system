@@ -1,0 +1,1 @@
+import{h as e}from"./index-C20UvrGJ.js";const s=()=>e.get("/member-levels"),m=s=>e.post("/member-levels",s),l=(s,m)=>e.put(`/member-levels/${s}`,m),t=s=>e.delete(`/member-levels/${s}`),r=()=>e.post("/member-levels/init");export{m as c,t as d,s as g,r as i,l as u};
