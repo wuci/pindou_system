@@ -4,6 +4,7 @@
     title="选择会员"
     width="700px"
     :close-on-click-modal="false"
+    append-to-body
     @close="handleClose"
   >
     <div class="search-container">

@@ -441,6 +441,15 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // 设置活动折扣信息
+        if (order.getDiscountId() != null) {
+            response.setDiscountId(order.getDiscountId());
+            response.setDiscountName(order.getDiscountName());
+            response.setDiscountRate(order.getDiscountRate() != null ? order.getDiscountRate().doubleValue() : null);
+            response.setActivityDiscountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount().doubleValue() : null);
+            response.setMemberDiscountAmount(order.getMemberDiscount() != null ? order.getMemberDiscount().doubleValue() : null);
+        }
+
         // 设置支付方式信息
         if (order.getPaymentMethod() != null) {
             response.setPaymentMethod(order.getPaymentMethod());
@@ -570,6 +579,15 @@ public class OrderServiceImpl implements OrderService {
             } catch (Exception e) {
                 log.error("获取会员信息异常: orderId={}, memberId={}, error={}", order.getId(), order.getMemberId(), e.getMessage(), e);
             }
+        }
+
+        // 设置活动折扣信息
+        if (order.getDiscountId() != null) {
+            response.setDiscountId(order.getDiscountId());
+            response.setDiscountName(order.getDiscountName());
+            response.setDiscountRate(order.getDiscountRate() != null ? order.getDiscountRate().doubleValue() : null);
+            response.setActivityDiscountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount().doubleValue() : null);
+            response.setMemberDiscountAmount(order.getMemberDiscount() != null ? order.getMemberDiscount().doubleValue() : null);
         }
 
         // 设置支付方式信息
@@ -709,6 +727,15 @@ public class OrderServiceImpl implements OrderService {
             } catch (Exception e) {
                 log.warn("获取订单详情会员信息失败: orderId={}, memberId={}, error={}", order.getId(), order.getMemberId(), e.getMessage());
             }
+        }
+
+        // 设置活动折扣信息
+        if (order.getDiscountId() != null) {
+            response.setDiscountId(order.getDiscountId());
+            response.setDiscountName(order.getDiscountName());
+            response.setDiscountRate(order.getDiscountRate() != null ? order.getDiscountRate().doubleValue() : null);
+            response.setActivityDiscountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount().doubleValue() : null);
+            response.setMemberDiscountAmount(order.getMemberDiscount() != null ? order.getMemberDiscount().doubleValue() : null);
         }
 
         // 设置支付方式信息
@@ -887,6 +914,15 @@ public class OrderServiceImpl implements OrderService {
                     response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
                 }
             }
+        }
+
+        // 设置活动折扣信息
+        if (order.getDiscountId() != null) {
+            response.setDiscountId(order.getDiscountId());
+            response.setDiscountName(order.getDiscountName());
+            response.setDiscountRate(order.getDiscountRate() != null ? order.getDiscountRate().doubleValue() : null);
+            response.setActivityDiscountAmount(order.getDiscountAmount() != null ? order.getDiscountAmount().doubleValue() : null);
+            response.setMemberDiscountAmount(order.getMemberDiscount() != null ? order.getMemberDiscount().doubleValue() : null);
         }
 
         // 设置支付方式信息

@@ -36,7 +36,7 @@ Thumbs.db
 
 .idea/
 .settings
-target
+target/
 .classpath
 .project
 *.iml
@@ -49,3 +49,4 @@ attribution_logs/*.log
 factor_result/
 *.csv
 *.lst
+inputFiles*

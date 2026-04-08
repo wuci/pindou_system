@@ -109,16 +109,23 @@
           <div class="price-item-inline">
             <span class="price-title">当前订单：</span>
             <span class="price-value-inline">¥{{ currentOrderAmount.toFixed(2) }}</span>
-            <span v-if="table?.originalAmount && table.originalAmount < table.amount" class="price-paid">
-              (已付¥{{ currentOrderAmount.toFixed(2) }})
-            </span>
+            <span class="price-paid">(已付)</span>
           </div>
 
           <!-- 续费费用 -->
           <div class="price-item-inline">
             <span class="price-title">本次续费：</span>
             <span class="price-value-inline">¥{{ extendOriginalPrice.toFixed(2) }}</span>
-            <span v-if="(selectedMember && memberDiscount > 0) || (form.applyActivityDiscount && extendFinalAmount > 0)" class="price-final">
+            <!-- 会员折扣显示 -->
+            <span v-if="selectedMember && memberDiscount > 0" class="price-final">
+              → <span class="member-discount">¥{{ extendMemberPrice.toFixed(2) }}</span>
+            </span>
+            <!-- 活动折扣显示（叠加在会员折扣之上） -->
+            <span v-if="form.applyActivityDiscount && extendFinalAmount > 0 && selectedMember && memberDiscount > 0" class="price-final">
+              → <span class="discount">¥{{ extendFinalPrice.toFixed(2) }}</span>
+            </span>
+            <!-- 无会员时仅显示活动折扣 -->
+            <span v-if="form.applyActivityDiscount && extendFinalAmount > 0 && !selectedMember" class="price-final">
               → <span class="discount">¥{{ extendFinalPrice.toFixed(2) }}</span>
             </span>
           </div>
@@ -127,6 +134,18 @@
           <div class="price-item-inline total">
             <span class="price-title">合计：</span>
             <span class="price-value-inline total">¥{{ totalFinalAmount.toFixed(2) }}</span>
+            <span class="price-note">
+              (已付¥{{ currentOrderAmount.toFixed(2) }} + 续费¥{{ extendFinalPrice.toFixed(2) }})
+              <span v-if="selectedMember && memberDiscount > 0 && form.applyActivityDiscount" class="discount-detail">
+                （会员{{ (memberDiscount * 10).toFixed(1) }}折 + 活动折扣）
+              </span>
+              <span v-else-if="selectedMember && memberDiscount > 0" class="discount-detail">
+                （会员{{ (memberDiscount * 10).toFixed(1) }}折）
+              </span>
+              <span v-else-if="form.applyActivityDiscount" class="discount-detail">
+                （活动折扣）
+              </span>
+            </span>
           </div>
         </div>
       </el-form-item>
@@ -493,20 +512,25 @@ const extendOriginalPrice = computed(() => {
   return originalPrice.value
 })
 
-// 续费折后价
-const extendFinalAmount = ref<number>(0) // 活动折扣计算的续费折后价
+// 续费折后价（活动折扣计算结果，已叠加会员折扣和活动折扣）
+const extendFinalAmount = ref<number>(0)
 
-const extendFinalPrice = computed(() => {
-  // 如果有活动折扣计算结果，优先使用
-  if (form.value.applyActivityDiscount && extendFinalAmount.value > 0) {
-    return extendFinalAmount.value
-  }
-
-  // 否则使用会员折扣
+// 续费会员折扣价（仅会员折扣，无活动折扣）
+const extendMemberPrice = computed(() => {
   if (selectedMember.value && memberDiscount.value > 0) {
     return extendOriginalPrice.value * memberDiscount.value
   }
   return extendOriginalPrice.value
+})
+
+const extendFinalPrice = computed(() => {
+  // 优先使用活动折扣计算结果（已包含会员折扣和活动折扣的叠加）
+  if (form.value.applyActivityDiscount && extendFinalAmount.value > 0) {
+    return extendFinalAmount.value
+  }
+
+  // 没有活动折扣时，使用会员折扣价
+  return extendMemberPrice.value
 })
 
 // 总原价（当前订单原价 + 续费原价）
@@ -514,7 +538,7 @@ const totalOriginalAmount = computed(() => {
   return currentOrderOriginalAmount.value + extendOriginalPrice.value
 })
 
-// 总折后价
+// 总折后价（当前订单实付 + 续费折后价）
 const totalFinalAmount = computed(() => {
   // 如果有活动折扣计算结果，使用：当前订单已付 + 续费折后价
   if (form.value.applyActivityDiscount && extendFinalAmount.value > 0) {
@@ -522,10 +546,11 @@ const totalFinalAmount = computed(() => {
   }
   // 否则使用会员折扣（只对续费金额应用会员折扣）
   if (selectedMember.value && memberDiscount.value > 0) {
-    // 当前订单金额 + 续费折后价
+    // 当前订单已付 + 续费折后价
     return (currentOrderAmount.value || 0) + (extendOriginalPrice.value * memberDiscount.value)
   }
-  return totalOriginalAmount.value
+  // 无折扣：当前订单已付 + 续费原价
+  return (currentOrderAmount.value || 0) + extendOriginalPrice.value
 })
 
 // 加载计费规则
@@ -719,6 +744,8 @@ const resetForm = () => {
   extendFinalAmount.value = 0
 
   // 如果桌台已有会员信息，自动设置会员（锁定状态）
+  // 注意：这里会恢复会员信息，所以不需要额外处理 extendFinalAmount
+  // 会员折扣会在 extendMemberPrice computed 中自动计算
   if (props.table?.memberId && props.table?.memberName) {
     isMember.value = true
     selectedMember.value = {
@@ -875,7 +902,8 @@ const handleActivityDiscountChange = (val: string | number | boolean) => {
   if (checked) {
     form.value.discountId = ''
     selectedDiscount.value = null
-    extendFinalAmount.value = 0
+    // 初始化为会员折扣价（后续选择活动折扣时会叠加）
+    extendFinalAmount.value = extendMemberPrice.value
     loadDiscounts()
   } else {
     form.value.discountId = ''
@@ -897,20 +925,36 @@ const handleDiscountChange = async (discountId: string) => {
   // 如果选择了折扣且有续费原价，调用API计算折扣
   if (discount && extendOriginalAmountValue > 0) {
     try {
-      // 只对续费金额计算折扣
-      const response = await calculateDiscountById(discountId, extendOriginalAmountValue, selectedMember.value?.id)
+      // 叠加折扣逻辑：先应用会员折扣，再应用活动折扣
+      let amountForActivityDiscount = extendOriginalAmountValue
+
+      // 步骤1：先应用会员折扣
+      if (selectedMember.value && memberDiscount.value > 0) {
+        amountForActivityDiscount = extendOriginalAmountValue * memberDiscount.value
+      }
+
+      // 步骤2：基于会员折扣后的价格，应用活动折扣
+      const response = await calculateDiscountById(discountId, amountForActivityDiscount, selectedMember.value?.id)
 
       if (response && response.finalAmount !== undefined) {
-        // 续费折后价 = API返回的折后价
+        // 续费折后价 = API返回的折后价（已叠加会员折扣和活动折扣）
         extendFinalAmount.value = response.finalAmount
       }
     } catch (error: any) {
-      // 恢复原价
-      extendFinalAmount.value = extendOriginalPrice.value || 0
+      // 恢复为会员折扣价或原价
+      if (selectedMember.value && memberDiscount.value > 0) {
+        extendFinalAmount.value = extendOriginalAmountValue * memberDiscount.value
+      } else {
+        extendFinalAmount.value = extendOriginalAmountValue
+      }
     }
   } else {
-    // 未选择折扣，恢复原价
-    extendFinalAmount.value = extendOriginalPrice.value || 0
+    // 未选择折扣，使用会员折扣价或原价
+    if (selectedMember.value && memberDiscount.value > 0) {
+      extendFinalAmount.value = extendOriginalAmountValue * memberDiscount.value
+    } else {
+      extendFinalAmount.value = extendOriginalAmountValue
+    }
   }
 }
 
@@ -1165,6 +1209,45 @@ const formatDiscountLabel = (discount: DiscountInfo) => {
   color: #67c23a;
   font-weight: 600;
   font-size: 17px;
+}
+
+.price-final .member-discount {
+  color: #409eff;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* 原价显示样式 */
+.price-item-inline .price-original {
+  font-size: 14px;
+  color: #909399;
+  text-decoration: line-through;
+  margin-right: 4px;
+}
+
+/* 折扣标签 */
+.price-discount-tag {
+  font-size: 12px;
+  color: #67c23a;
+  padding: 2px 6px;
+  background: #f0f9ff;
+  border: 1px solid #67c23a;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* 计算说明 */
+.price-note {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.discount-detail {
+  color: #67c23a;
+  font-size: 11px;
+  margin-left: 4px;
 }
 
 .discount-tag-inline {

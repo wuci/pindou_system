@@ -85,6 +85,26 @@ public class Order implements Serializable {
     @TableField("member_id")
     private Long memberId;
 
+    @Schema(description = "活动折扣ID")
+    @TableField("discount_id")
+    private String discountId;
+
+    @Schema(description = "活动折扣名称")
+    @TableField("discount_name")
+    private String discountName;
+
+    @Schema(description = "活动折扣率（0.9表示9折）")
+    @TableField("discount_rate")
+    private BigDecimal discountRate;
+
+    @Schema(description = "活动折扣金额")
+    @TableField("discount_amount")
+    private BigDecimal discountAmount;
+
+    @Schema(description = "会员折扣金额")
+    @TableField("member_discount")
+    private BigDecimal memberDiscount;
+
     @Schema(description = "原价（折扣前）")
     @TableField("original_amount")
     private BigDecimal originalAmount;

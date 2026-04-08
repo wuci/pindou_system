@@ -465,7 +465,11 @@ public class TableServiceImpl implements TableService {
         double originalAmount = 0.0;
         double finalAmount = 0.0;
         String discountId = null;
+        String discountName = null;
         BigDecimal discountRate = null;
+        double totalDiscountAmount = 0.0;
+        double activityDiscountAmount = 0.0;
+        double memberDiscountAmount = 0.0;
 
         // 不限时套餐：获取不限时套餐价格
         if (request.getUnlimited() != null && request.getUnlimited()) {
@@ -486,30 +490,82 @@ public class TableServiceImpl implements TableService {
 
             log.info("使用渠道 {} 计算初始费用: presetDuration={}秒, originalAmount={}", channel, presetDuration, originalAmount);
 
-            // 判断是否应用活动折扣
+            // 叠加折扣逻辑：先应用会员折扣，再应用活动折扣
+            double amountAfterMemberDiscount = originalAmount;
+            String memberDiscountName = null;
+            BigDecimal memberDiscountRateValue = null;
+
+            // 步骤1：应用会员折扣
+            if (request.getMemberId() != null) {
+                amountAfterMemberDiscount = memberDiscountService.applyDiscount(request.getMemberId(), originalAmount);
+                // 保留两位小数，四舍五入
+                amountAfterMemberDiscount = Math.round(amountAfterMemberDiscount * 100.0) / 100.0;
+                // 获取会员折扣信息
+                try {
+                    Member member = memberMapper.selectById(request.getMemberId());
+                    if (member != null && member.getLevelId() != null) {
+                        MemberLevel memberLevel = memberLevelMapper.selectById(member.getLevelId());
+                        if (memberLevel != null) {
+                            memberDiscountName = memberLevel.getName();
+                            memberDiscountRateValue = memberLevel.getDiscountRate();
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("获取会员折扣信息失败: {}", e.getMessage());
+                }
+                log.info("应用会员折扣: originalAmount={}, amountAfterMemberDiscount={}, memberDiscountName={}, memberDiscountRate={}",
+                        originalAmount, amountAfterMemberDiscount, memberDiscountName, memberDiscountRateValue);
+            }
+
+            // 步骤2：应用活动折扣（在会员折扣后的价格基础上）
             if (request.getDiscountId() != null && !request.getDiscountId().isEmpty()) {
                 discountId = request.getDiscountId();
-                // 根据折扣ID计算折扣
+                // 根据折扣ID计算折扣（基于会员折扣后的价格）
                 CalculateDiscountResponse discountResponse = discountService.calculateDiscountById(
                         request.getDiscountId(),
-                        BigDecimal.valueOf(originalAmount),
+                        BigDecimal.valueOf(amountAfterMemberDiscount),
                         request.getMemberId()
                 );
                 if (discountResponse != null && discountResponse.getFinalAmount() != null) {
+                    discountName = discountResponse.getAppliedDiscountName();
                     discountRate = discountResponse.getDiscountRate();
-                    // 使用折扣率重新计算：原价 × 折扣率
-                    finalAmount = originalAmount * discountRate.doubleValue();
-                    log.info("应用活动折扣: originalAmount={}, finalAmount={}, discountRate={}, appliedDiscount={}",
-                            originalAmount, finalAmount, discountRate, discountResponse.getAppliedDiscountName());
+                    finalAmount = discountResponse.getFinalAmount().doubleValue();
+                    // 保留两位小数，四舍五入
+                    finalAmount = Math.round(finalAmount * 100.0) / 100.0;
+                    // 计算各项折扣金额，保留两位小数
+                    totalDiscountAmount = Math.round((originalAmount - finalAmount) * 100.0) / 100.0;
+                    activityDiscountAmount = Math.round((amountAfterMemberDiscount - finalAmount) * 100.0) / 100.0;
+                    memberDiscountAmount = Math.round((originalAmount - amountAfterMemberDiscount) * 100.0) / 100.0;
+
+                    // 组合折扣名称
+                    if (memberDiscountName != null) {
+                        discountName = memberDiscountName + "+" + discountResponse.getAppliedDiscountName();
+                    }
+
+                    log.info("应用活动折扣（叠加）: amountAfterMemberDiscount={}, finalAmount={}, discountRate={}, discountName={}, totalDiscountAmount={}, memberDiscountAmount={}, activityDiscountAmount={}",
+                            amountAfterMemberDiscount, finalAmount, discountRate, discountName, totalDiscountAmount, memberDiscountAmount, activityDiscountAmount);
+                } else {
+                    // 活动折扣应用失败，使用会员折扣后的价格
+                    finalAmount = amountAfterMemberDiscount;
+                    totalDiscountAmount = Math.round((originalAmount - amountAfterMemberDiscount) * 100.0) / 100.0;
+                    memberDiscountAmount = totalDiscountAmount;
+                    discountName = memberDiscountName;
+                    discountRate = memberDiscountRateValue;
+                    log.info("活动折扣应用失败，使用会员折扣: finalAmount={}, totalDiscountAmount={}", finalAmount, totalDiscountAmount);
                 }
-            } else if (request.getMemberId() != null) {
-                // 仅应用会员折扣
-                finalAmount = memberDiscountService.applyDiscount(request.getMemberId(), originalAmount);
-                log.info("应用会员折扣: originalAmount={}, finalAmount={}", originalAmount, finalAmount);
+            } else {
+                // 没有活动折扣，使用会员折扣后的价格
+                finalAmount = amountAfterMemberDiscount;
+                totalDiscountAmount = Math.round((originalAmount - amountAfterMemberDiscount) * 100.0) / 100.0;
+                memberDiscountAmount = totalDiscountAmount;
+                discountName = memberDiscountName;
+                discountRate = memberDiscountRateValue;
+                log.info("仅应用会员折扣: finalAmount={}, totalDiscountAmount={}", finalAmount, totalDiscountAmount);
             }
         }
 
-        return new AmountCalculationResult(originalAmount, finalAmount, discountId, discountRate);
+        return new AmountCalculationResult(originalAmount, finalAmount, discountId, discountName, discountRate,
+                totalDiscountAmount, activityDiscountAmount, memberDiscountAmount);
     }
 
     /**
@@ -537,6 +593,13 @@ public class TableServiceImpl implements TableService {
         order.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : TableConstants.PaymentMethod.OFFLINE);
         order.setBalanceAmount(BigDecimal.ZERO);
         order.setOtherPaymentAmount(BigDecimal.ZERO);
+
+        // 保存活动折扣信息
+        order.setDiscountId(amountCalc.getDiscountId());
+        order.setDiscountName(amountCalc.getDiscountName());
+        order.setDiscountRate(amountCalc.getDiscountRate());
+        order.setDiscountAmount(BigDecimal.valueOf(amountCalc.getActivityDiscountAmount()));
+        order.setMemberDiscount(BigDecimal.valueOf(amountCalc.getMemberDiscountAmount()));
 
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
@@ -718,7 +781,9 @@ public class TableServiceImpl implements TableService {
 
         // 返回本次续费的实际金额，不累加原订单金额
         return new ExtendCalculationResult(extendFee, finalAmount, newPresetDuration,
-                discountCalc.getDiscountId(), discountCalc.getDiscountRate());
+                discountCalc.getDiscountId(), discountCalc.getDiscountName(),
+                discountCalc.getDiscountRate(), discountCalc.getDiscountAmount(),
+                discountCalc.getActivityDiscountAmount(), discountCalc.getMemberDiscountAmount());
     }
 
     /**
@@ -727,12 +792,22 @@ public class TableServiceImpl implements TableService {
     private static class ExtendDiscountCalculation {
         private final double finalAmount;
         private final String discountId;
+        private final String discountName;
         private final BigDecimal discountRate;
+        private final double totalDiscountAmount;      // 总折扣金额（会员折扣+活动折扣）
+        private final double activityDiscountAmount;    // 活动折扣金额
+        private final double memberDiscountAmount;      // 会员折扣金额
 
-        public ExtendDiscountCalculation(double finalAmount, String discountId, BigDecimal discountRate) {
+        public ExtendDiscountCalculation(double finalAmount, String discountId, String discountName,
+                                         BigDecimal discountRate, double totalDiscountAmount,
+                                         double activityDiscountAmount, double memberDiscountAmount) {
             this.finalAmount = finalAmount;
             this.discountId = discountId;
+            this.discountName = discountName;
             this.discountRate = discountRate;
+            this.totalDiscountAmount = totalDiscountAmount;
+            this.activityDiscountAmount = activityDiscountAmount;
+            this.memberDiscountAmount = memberDiscountAmount;
         }
 
         public double getFinalAmount() {
@@ -743,8 +818,24 @@ public class TableServiceImpl implements TableService {
             return discountId;
         }
 
+        public String getDiscountName() {
+            return discountName;
+        }
+
         public BigDecimal getDiscountRate() {
             return discountRate;
+        }
+
+        public double getDiscountAmount() {
+            return totalDiscountAmount;
+        }
+
+        public double getActivityDiscountAmount() {
+            return activityDiscountAmount;
+        }
+
+        public double getMemberDiscountAmount() {
+            return memberDiscountAmount;
         }
     }
 
@@ -752,33 +843,75 @@ public class TableServiceImpl implements TableService {
      * 计算续费折扣
      */
     private ExtendDiscountCalculation calculateExtendDiscount(ExtendTableRequest request, Order order, double newOriginalAmount) {
-        // 判断是否应用新的活动折扣
+        // 叠加折扣逻辑：先应用会员折扣，再应用活动折扣
+        double amountAfterMemberDiscount = newOriginalAmount;
+        String memberDiscountName = null;
+        BigDecimal memberDiscountRate = null;
+
+        // 步骤1：应用会员折扣
+        if (request.getMemberId() != null) {
+            amountAfterMemberDiscount = memberDiscountService.applyDiscount(request.getMemberId(), newOriginalAmount);
+            // 保留两位小数，四舍五入
+            amountAfterMemberDiscount = Math.round(amountAfterMemberDiscount * 100.0) / 100.0;
+            // 获取会员折扣信息
+            try {
+                Member member = memberMapper.selectById(request.getMemberId());
+                if (member != null && member.getLevelId() != null) {
+                    MemberLevel memberLevel = memberLevelMapper.selectById(member.getLevelId());
+                    if (memberLevel != null) {
+                        memberDiscountName = memberLevel.getName();
+                        memberDiscountRate = memberLevel.getDiscountRate();
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("获取会员折扣信息失败: {}", e.getMessage());
+            }
+            log.info("续费应用会员折扣: originalAmount={}, amountAfterMemberDiscount={}, memberDiscountName={}, memberDiscountRate={}",
+                    newOriginalAmount, amountAfterMemberDiscount, memberDiscountName, memberDiscountRate);
+        }
+
+        // 步骤2：应用活动折扣（在会员折扣后的价格基础上）
         if (request.getDiscountId() != null && !request.getDiscountId().isEmpty()) {
-            // 续费折扣计算：只针对本次续费，不混入历史折扣
+            // 续费折扣计算：基于会员折扣后的价格
             CalculateDiscountResponse discountResponse = discountService.calculateDiscountById(
                     request.getDiscountId(),
-                    BigDecimal.valueOf(newOriginalAmount),
+                    BigDecimal.valueOf(amountAfterMemberDiscount),
                     request.getMemberId()
             );
             if (discountResponse != null && discountResponse.getFinalAmount() != null) {
-                // 直接使用本次折扣率，不计算平均折扣率
                 double finalAmount = discountResponse.getFinalAmount().doubleValue();
+                // 保留两位小数，四舍五入
+                finalAmount = Math.round(finalAmount * 100.0) / 100.0;
                 BigDecimal discountRate = discountResponse.getDiscountRate();
+                String discountName = discountResponse.getAppliedDiscountName();
+                // 计算各项折扣金额，保留两位小数
+                double totalDiscountAmount = Math.round((newOriginalAmount - finalAmount) * 100.0) / 100.0;
+                double activityDiscountAmount = Math.round((amountAfterMemberDiscount - finalAmount) * 100.0) / 100.0;
+                double memberDiscountAmount = Math.round((newOriginalAmount - amountAfterMemberDiscount) * 100.0) / 100.0;
 
-                log.info("续费应用活动折扣: originalAmount={}, finalAmount={}, discountRate={}",
-                        newOriginalAmount, finalAmount, discountRate);
+                log.info("续费应用活动折扣（叠加）: amountAfterMemberDiscount={}, finalAmount={}, discountRate={}, discountName={}, totalDiscountAmount={}, memberDiscountAmount={}, activityDiscountAmount={}",
+                        amountAfterMemberDiscount, finalAmount, discountRate, discountName, totalDiscountAmount, memberDiscountAmount, activityDiscountAmount);
 
-                return new ExtendDiscountCalculation(finalAmount, request.getDiscountId(), discountRate);
+                // 返回活动折扣信息，同时记录会员折扣信息到折扣名称中
+                String combinedDiscountName = discountName;
+                if (memberDiscountName != null) {
+                    combinedDiscountName = memberDiscountName + "+" + discountName;
+                }
+
+                return new ExtendDiscountCalculation(finalAmount, request.getDiscountId(), combinedDiscountName, discountRate, totalDiscountAmount, activityDiscountAmount, memberDiscountAmount);
             }
         }
 
-        // 没有新折扣，使用会员折扣或原价
-        double finalAmount = newOriginalAmount;
+        // 没有活动折扣，使用会员折扣后的价格
         if (request.getMemberId() != null) {
-            finalAmount = memberDiscountService.applyDiscount(request.getMemberId(), newOriginalAmount);
+            // 有会员折扣但无活动折扣，返回会员折扣信息
+            double totalDiscountAmount = Math.round((newOriginalAmount - amountAfterMemberDiscount) * 100.0) / 100.0;
+            log.info("续费仅应用会员折扣: finalAmount={}, totalDiscountAmount={}", amountAfterMemberDiscount, totalDiscountAmount);
+            return new ExtendDiscountCalculation(amountAfterMemberDiscount, null, memberDiscountName, memberDiscountRate, totalDiscountAmount, 0, totalDiscountAmount);
         }
 
-        return new ExtendDiscountCalculation(finalAmount, null, null);
+        // 没有任何折扣
+        return new ExtendDiscountCalculation(newOriginalAmount, null, null, null, 0, 0, 0);
     }
 
     /**
@@ -800,6 +933,17 @@ public class TableServiceImpl implements TableService {
         order.setPresetDuration(extendCalc.getNewPresetDuration());
         order.setOriginalAmount(BigDecimal.valueOf(extendCalc.getNewOriginalAmount()));
         order.setAmount(BigDecimal.valueOf(extendCalc.getNewTotalAmount()));
+
+        // 更新活动折扣信息
+        order.setDiscountId(extendCalc.getDiscountId());
+        order.setDiscountName(extendCalc.getDiscountName());
+        order.setDiscountRate(extendCalc.getDiscountRate());
+        order.setDiscountAmount(BigDecimal.valueOf(extendCalc.getActivityDiscountAmount()));
+        // 累加会员折扣金额
+        BigDecimal currentMemberDiscount = order.getMemberDiscount() != null ? order.getMemberDiscount() : BigDecimal.ZERO;
+        BigDecimal newMemberDiscount = BigDecimal.valueOf(extendCalc.getMemberDiscountAmount());
+        order.setMemberDiscount(currentMemberDiscount.add(newMemberDiscount));
+
         order.setUpdatedAt(now);
     }
 
@@ -877,6 +1021,15 @@ public class TableServiceImpl implements TableService {
         childOrder.setStatus(TableConstants.OrderStatus.ACTIVE);
         childOrder.setOperatorId(userId);
         childOrder.setOperatorName(username);
+
+        // 保存活动折扣信息
+        childOrder.setDiscountId(extendCalc.getDiscountId());
+        childOrder.setDiscountName(extendCalc.getDiscountName());
+        childOrder.setDiscountRate(extendCalc.getDiscountRate());
+        childOrder.setDiscountAmount(BigDecimal.valueOf(extendCalc.getActivityDiscountAmount()));
+        // 保存会员折扣金额
+        childOrder.setMemberDiscount(BigDecimal.valueOf(extendCalc.getMemberDiscountAmount()));
+
         childOrder.setCreatedAt(now);
         childOrder.setUpdatedAt(now);
         return childOrder;
@@ -956,6 +1109,23 @@ public class TableServiceImpl implements TableService {
         BigDecimal totalAmount = originalOrder.getAmount()
                 .add(BigDecimal.valueOf(extendCalc.getNewTotalAmount()));
 
+        // 累加会员折扣金额
+        BigDecimal currentMemberDiscount = originalOrder.getMemberDiscount() != null ? originalOrder.getMemberDiscount() : BigDecimal.ZERO;
+        BigDecimal newMemberDiscount = BigDecimal.valueOf(extendCalc.getMemberDiscountAmount());
+        originalOrder.setMemberDiscount(currentMemberDiscount.add(newMemberDiscount));
+
+        // 累加活动折扣金额
+        BigDecimal currentDiscountAmount = originalOrder.getDiscountAmount() != null ? originalOrder.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal newDiscountAmount = BigDecimal.valueOf(extendCalc.getActivityDiscountAmount());
+        originalOrder.setDiscountAmount(currentDiscountAmount.add(newDiscountAmount));
+
+        // 更新折扣信息（使用续费的折扣信息）
+        if (extendCalc.getDiscountId() != null) {
+            originalOrder.setDiscountId(extendCalc.getDiscountId());
+            originalOrder.setDiscountName(extendCalc.getDiscountName());
+            originalOrder.setDiscountRate(extendCalc.getDiscountRate());
+        }
+
         // 更新汇总金额
         originalOrder.setOriginalAmount(totalOriginalAmount);
         originalOrder.setAmount(totalAmount);
@@ -999,6 +1169,12 @@ public class TableServiceImpl implements TableService {
         childOrder.setOtherPaymentAmount(originalOrder.getOtherPaymentAmount());
         childOrder.setOperatorId(originalOrder.getOperatorId());
         childOrder.setOperatorName(originalOrder.getOperatorName());
+        // 复制折扣信息
+        childOrder.setDiscountId(originalOrder.getDiscountId());
+        childOrder.setDiscountName(originalOrder.getDiscountName());
+        childOrder.setDiscountRate(originalOrder.getDiscountRate());
+        childOrder.setDiscountAmount(originalOrder.getDiscountAmount());
+        childOrder.setMemberDiscount(originalOrder.getMemberDiscount());
         childOrder.setCreatedAt(originalOrder.getCreatedAt());
         childOrder.setUpdatedAt(now);
         return childOrder;
@@ -1904,17 +2080,27 @@ public class TableServiceImpl implements TableService {
         private final double originalAmount;
         private final double finalAmount;
         private final String discountId;
+        private final String discountName;
         private final BigDecimal discountRate;
+        private final double totalDiscountAmount;      // 总折扣金额
+        private final double activityDiscountAmount;    // 活动折扣金额
+        private final double memberDiscountAmount;      // 会员折扣金额
 
-        public AmountCalculationResult(double originalAmount, double finalAmount, String discountId, BigDecimal discountRate) {
+        public AmountCalculationResult(double originalAmount, double finalAmount, String discountId,
+                                       String discountName, BigDecimal discountRate,
+                                       double totalDiscountAmount, double activityDiscountAmount, double memberDiscountAmount) {
             this.originalAmount = originalAmount;
             this.finalAmount = finalAmount;
             this.discountId = discountId;
+            this.discountName = discountName;
             this.discountRate = discountRate;
+            this.totalDiscountAmount = totalDiscountAmount;
+            this.activityDiscountAmount = activityDiscountAmount;
+            this.memberDiscountAmount = memberDiscountAmount;
         }
 
         public AmountCalculationResult(double originalAmount, double finalAmount) {
-            this(originalAmount, finalAmount, null, null);
+            this(originalAmount, finalAmount, null, null, null, 0, 0, 0);
         }
 
         public double getOriginalAmount() {
@@ -1929,8 +2115,24 @@ public class TableServiceImpl implements TableService {
             return discountId;
         }
 
+        public String getDiscountName() {
+            return discountName;
+        }
+
         public BigDecimal getDiscountRate() {
             return discountRate;
+        }
+
+        public double getDiscountAmount() {
+            return totalDiscountAmount;
+        }
+
+        public double getActivityDiscountAmount() {
+            return activityDiscountAmount;
+        }
+
+        public double getMemberDiscountAmount() {
+            return memberDiscountAmount;
         }
     }
 
@@ -1942,19 +2144,28 @@ public class TableServiceImpl implements TableService {
         private final double newTotalAmount;
         private final Integer newPresetDuration;
         private final String discountId;
+        private final String discountName;
         private final BigDecimal discountRate;
+        private final double totalDiscountAmount;      // 总折扣金额
+        private final double activityDiscountAmount;    // 活动折扣金额
+        private final double memberDiscountAmount;      // 会员折扣金额
 
         public ExtendCalculationResult(double newOriginalAmount, double newTotalAmount, Integer newPresetDuration,
-                                       String discountId, BigDecimal discountRate) {
+                                       String discountId, String discountName, BigDecimal discountRate,
+                                       double totalDiscountAmount, double activityDiscountAmount, double memberDiscountAmount) {
             this.newOriginalAmount = newOriginalAmount;
             this.newTotalAmount = newTotalAmount;
             this.newPresetDuration = newPresetDuration;
             this.discountId = discountId;
+            this.discountName = discountName;
             this.discountRate = discountRate;
+            this.totalDiscountAmount = totalDiscountAmount;
+            this.activityDiscountAmount = activityDiscountAmount;
+            this.memberDiscountAmount = memberDiscountAmount;
         }
 
         public ExtendCalculationResult(double newOriginalAmount, double newTotalAmount, Integer newPresetDuration) {
-            this(newOriginalAmount, newTotalAmount, newPresetDuration, null, null);
+            this(newOriginalAmount, newTotalAmount, newPresetDuration, null, null, null, 0, 0, 0);
         }
 
         public double getNewOriginalAmount() {
@@ -1973,8 +2184,24 @@ public class TableServiceImpl implements TableService {
             return discountId;
         }
 
+        public String getDiscountName() {
+            return discountName;
+        }
+
         public BigDecimal getDiscountRate() {
             return discountRate;
+        }
+
+        public double getDiscountAmount() {
+            return totalDiscountAmount;
+        }
+
+        public double getActivityDiscountAmount() {
+            return activityDiscountAmount;
+        }
+
+        public double getMemberDiscountAmount() {
+            return memberDiscountAmount;
         }
     }
 }

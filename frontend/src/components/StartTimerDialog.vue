@@ -14,29 +14,31 @@
 
       <!-- 会员选择 -->
       <el-form-item label="会员">
-        <el-switch
-          v-model="isMember"
-          active-text="会员"
-          inactive-text="非会员"
-          @change="handleMemberToggle"
-        />
-        <el-button
-          v-if="isMember"
-          type="primary"
-          size="small"
-          @click="showMemberDialog"
-          style="margin-left: 12px"
-        >
-          {{ selectedMember ? selectedMember.name : '选择会员' }}
-        </el-button>
-        <div v-if="selectedMember" class="member-info-detail">
-          <div class="member-info-row">
-            <el-tag type="success" size="small">{{ selectedMember.levelName }}</el-tag>
-            <span style="margin-left: 8px;">{{ (selectedMember.discountRate * 10).toFixed(1) }}折</span>
-          </div>
-          <div class="member-info-row">
-            <span class="member-balance-label">会员余额：</span>
-            <span class="member-balance-value">¥{{ selectedMember.balance.toFixed(2) }}</span>
+        <div class="member-selection-inline">
+          <el-switch
+            v-model="isMember"
+            active-text="会员"
+            inactive-text="非会员"
+            @change="handleMemberToggle"
+          />
+          <el-button
+            v-if="isMember"
+            type="primary"
+            size="small"
+            @click="showMemberDialog"
+            style="margin-left: 12px"
+          >
+            {{ selectedMember ? selectedMember.name : '选择会员' }}
+          </el-button>
+          <div v-if="selectedMember" class="member-info-detail">
+            <div class="member-info-row">
+              <el-tag type="success" size="small">{{ selectedMember.levelName || '会员' }}</el-tag>
+              <span style="margin-left: 8px;">{{ (selectedMember.discountRate * 10).toFixed(1) }}折</span>
+            </div>
+            <div class="member-info-row">
+              <span class="member-balance-label">会员余额：</span>
+              <span class="member-balance-value">¥{{ selectedMember.balance.toFixed(2) }}</span>
+            </div>
           </div>
         </div>
       </el-form-item>
@@ -109,22 +111,40 @@
 
       <!-- 费用信息（始终显示） -->
       <el-form-item label="费用">
-        <!-- 选择会员时：显示原价和折扣价 -->
+        <!-- 选择会员时：显示完整折扣流程 -->
         <div v-if="selectedMember" class="price-display-row">
+          <!-- 原价 -->
           <div class="price-item-inline">
             <span class="price-label">原价：</span>
             <span class="price-original">¥{{ originalPrice.toFixed(2) }}</span>
           </div>
-          <div class="price-item-inline">
+          <!-- 会员折扣价 -->
+          <div v-if="memberDiscount > 0" class="price-item-inline">
+            <span class="price-label"></span>
+            <span class="price-final">
+              → <span class="member-discount">¥{{ memberPrice.toFixed(2) }}</span>
+            </span>
+          </div>
+          <!-- 活动折扣价（叠加在会员折扣之上） -->
+          <div v-if="form.applyActivityDiscount && finalAmount > 0" class="price-item-inline">
+            <span class="price-label"></span>
+            <span class="price-final">
+              → <span class="discount">¥{{ finalPrice.toFixed(2) }}</span>
+            </span>
+          </div>
+          <!-- 没有活动折扣时显示最终价 -->
+          <div v-else class="price-item-inline">
             <span class="price-label">折扣价：</span>
-            <span class="price-discount">¥{{ discountedPrice.toFixed(2) }}</span>
+            <span class="price-discount">¥{{ finalPrice.toFixed(2) }}</span>
             <span v-if="memberDiscount > 0" class="discount-tag">
               ({{ (memberDiscount * 10).toFixed(1) }}折)
             </span>
           </div>
         </div>
         <!-- 未选择会员时：只显示价格 -->
-        <span v-else class="price-normal">¥{{ originalPrice.toFixed(2) }}</span>
+        <div v-else>
+          <span class="price-normal">¥{{ originalPrice.toFixed(2) }}</span>
+        </div>
       </el-form-item>
 
       <!-- 支付方式选择 -->
@@ -447,8 +467,29 @@ const isSelectedRuleUnlimited = computed(() => {
   return currentSelectedRule.value?.unlimited === true
 })
 
-// 折扣价（可以被活动折扣计算结果覆盖）
-const discountedPrice = ref(0)
+// 折扣价（仅会员折扣）
+const memberPrice = computed(() => {
+  if (selectedMember.value && memberDiscount.value > 0) {
+    return originalPrice.value * memberDiscount.value
+  }
+  return originalPrice.value
+})
+
+// 活动折扣计算结果（已叠加会员折扣和活动折扣）
+const finalAmount = ref(0)
+
+// 最终价格（优先使用活动折扣计算结果，否则使用会员折扣价）
+const finalPrice = computed(() => {
+  // 优先使用活动折扣计算结果（已包含会员折扣和活动折扣的叠加）
+  if (form.value.applyActivityDiscount && finalAmount.value > 0) {
+    return finalAmount.value
+  }
+  // 没有活动折扣时，使用会员折扣价
+  return memberPrice.value
+})
+
+// 兼容旧代码：discountedPrice 使用 finalPrice
+const discountedPrice = computed(() => finalPrice.value)
 
 // 总时长预览（套餐时长 + 延时时长）
 const totalDurationPreview = computed(() => {
@@ -638,7 +679,7 @@ const initializeForm = () => {
   // 重置折扣相关
   availableDiscounts.value = []
   selectedDiscount.value = null
-  discountedPrice.value = 0
+  finalAmount.value = 0
   memberDiscount.value = 1
 
   // 重置支付方式为默认值
@@ -841,9 +882,10 @@ const handleMemberSelected = (member: MemberInfo) => {
   selectedMember.value = member
   // 更新会员折扣率
   memberDiscount.value = member.discountRate || 1
-  // 更新折扣价
-  if (originalPrice.value > 0 && memberDiscount.value > 0) {
-    discountedPrice.value = originalPrice.value * memberDiscount.value
+  // 如果应用了活动折扣，重新计算
+  if (form.value.applyActivityDiscount && form.value.discountId) {
+    // 触发重新计算活动折扣
+    handleDiscountChange(form.value.discountId)
   }
   ElMessage.success(`已选择会员：${member.name}`)
   // 刷新折扣列表（因为会员等级变化了）
@@ -858,38 +900,57 @@ const handleActivityDiscountChange = (val: string | number | boolean) => {
   if (checked) {
     form.value.discountId = ''
     selectedDiscount.value = null
+    // 初始化为会员折扣价（后续选择活动折扣时会叠加）
+    finalAmount.value = memberPrice.value
     loadDiscounts()
   } else {
     form.value.discountId = ''
     selectedDiscount.value = null
     availableDiscounts.value = []
+    finalAmount.value = 0
   }
 }
 
 // 折扣选择变化处理
 const handleDiscountChange = async (discountId: string) => {
   const discount = availableDiscounts.value.find(d => d.id === discountId)
+  if (!discount) return
   selectedDiscount.value = discount
 
-  // 如果选择了折扣且有原价，调用API计算折扣
-  if (discount && originalPrice.value > 0) {
-    try {
-      const response = await calculateDiscountById(discountId, originalPrice.value, selectedMember.value?.id)
+  const originalAmountValue = originalPrice.value || 0
 
-      if (response) {
-        // 更新折扣价格显示
-        discountedPrice.value = response.finalAmount
-        memberDiscount.value = response.discountRate
+  // 如果选择了折扣且有原价，调用API计算折扣
+  if (discount && originalAmountValue > 0) {
+    try {
+      // 叠加折扣逻辑：先应用会员折扣，再应用活动折扣
+      let amountForActivityDiscount = originalAmountValue
+
+      // 步骤1：先应用会员折扣
+      if (selectedMember.value && memberDiscount.value > 0) {
+        amountForActivityDiscount = originalAmountValue * memberDiscount.value
+      }
+
+      // 步骤2：基于会员折扣后的价格，应用活动折扣
+      const response = await calculateDiscountById(discountId, amountForActivityDiscount, selectedMember.value?.id)
+
+      if (response && response.finalAmount !== undefined) {
+        finalAmount.value = response.finalAmount
       }
     } catch (error: any) {
-      // 恢复原价
-      discountedPrice.value = originalPrice.value
-      memberDiscount.value = 1
+      // 恢复为会员折扣价或原价
+      if (selectedMember.value && memberDiscount.value > 0) {
+        finalAmount.value = originalAmountValue * memberDiscount.value
+      } else {
+        finalAmount.value = originalAmountValue
+      }
     }
   } else {
-    // 未选择折扣，恢复原价
-    discountedPrice.value = originalPrice.value
-    memberDiscount.value = 1
+    // 未选择折扣，使用会员折扣价或原价
+    if (selectedMember.value && memberDiscount.value > 0) {
+      finalAmount.value = originalAmountValue * memberDiscount.value
+    } else {
+      finalAmount.value = originalAmountValue
+    }
   }
 }
 
@@ -1019,6 +1080,25 @@ defineExpose({
   color: #67C23A;
 }
 
+/* 价格箭头显示 */
+.price-final {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.price-final .discount {
+  color: #67c23a;
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.price-final .member-discount {
+  color: #409eff;
+  font-weight: 600;
+  font-size: 16px;
+}
+
 .discount-tag {
   font-size: 12px;
   color: #67C23A;
@@ -1142,6 +1222,14 @@ defineExpose({
 
 .balance-amount-info .el-icon {
   font-size: 14px;
+}
+
+/* 会员信息展示样式 */
+.member-selection-inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .member-info-detail {

@@ -90,6 +90,21 @@ public class OrderDetailResponse implements Serializable {
     @Schema(description = "会员折扣率")
     private Double memberDiscountRate;
 
+    @Schema(description = "活动折扣ID")
+    private String discountId;
+
+    @Schema(description = "活动折扣名称")
+    private String discountName;
+
+    @Schema(description = "活动折扣率")
+    private Double discountRate;
+
+    @Schema(description = "活动折扣金额")
+    private Double activityDiscountAmount;
+
+    @Schema(description = "会员折扣金额")
+    private Double memberDiscountAmount;
+
     @Schema(description = "会员信息")
     private MemberInfo memberInfo;
 
