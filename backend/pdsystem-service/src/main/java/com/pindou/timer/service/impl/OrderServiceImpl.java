@@ -84,15 +84,29 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> pageObj = new Page<>(page, pageSize);
         Page<Order> resultPage = orderMapper.selectPage(pageObj, wrapper);
 
-        // 批量预加载数据，优化性能（包括父订单和子订单的会员数据）
+        // 批量预加载数据，优化性能
         List<Order> orders = resultPage.getRecords();
-        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(orders);
+        long preloadStart = System.currentTimeMillis();
+
+        // 1. 批量预加载子订单
+        java.util.Map<String, List<Order>> childOrderMap = preloadChildOrders(orders);
+
+        // 2. 批量预加载会员数据（包括子订单）
+        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(childOrderMap, orders);
+
+        // 3. 批量预加载会员等级数据
         java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
 
+        long preloadEnd = System.currentTimeMillis();
+        log.info("批量预加载耗时: {}ms", preloadEnd - preloadStart);
+
         // 转换结果
+        long convertStart = System.currentTimeMillis();
         List<OrderInfoResponse> records = orders.stream()
-                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap))
+                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap, childOrderMap))
                 .collect(Collectors.toList());
+        long convertEnd = System.currentTimeMillis();
+        log.info("转换响应对象耗时: {}ms", convertEnd - convertStart);
 
         // 使用 PageResult.of 构建分页结果
         PageResult<OrderInfoResponse> pageResult = PageResult.of(
@@ -127,14 +141,21 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> pageObj = new Page<>(page, pageSize);
         Page<Order> resultPage = orderMapper.selectPage(pageObj, wrapper);
 
-        // 批量预加载数据，优化性能（包括父订单和子订单的会员数据）
+        // 批量预加载数据，优化性能
         List<Order> orders = resultPage.getRecords();
-        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(orders);
+
+        // 1. 批量预加载子订单
+        java.util.Map<String, List<Order>> childOrderMap = preloadChildOrders(orders);
+
+        // 2. 批量预加载会员数据（包括子订单）
+        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(childOrderMap, orders);
+
+        // 3. 批量预加载会员等级数据
         java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
 
         // 转换结果
         List<OrderInfoResponse> records = orders.stream()
-                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap))
+                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap, childOrderMap))
                 .collect(Collectors.toList());
 
         // 使用 PageResult.of 构建分页结果
@@ -175,12 +196,47 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
+     * 批量预加载子订单数据
+     *
+     * @param parentOrders 父订单列表
+     * @return 父订单ID -> 子订单列表的映射
+     */
+    private java.util.Map<String, List<Order>> preloadChildOrders(List<Order> parentOrders) {
+        if (parentOrders == null || parentOrders.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 收集所有父订单ID
+        List<String> parentIds = parentOrders.stream()
+                .filter(order -> order != null && order.getId() != null)
+                .map(Order::getId)
+                .collect(Collectors.toList());
+
+        if (parentIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询所有子订单
+        List<Order> allChildOrders = orderMapper.selectList(
+                new LambdaQueryWrapper<Order>()
+                        .in(Order::getParentId, parentIds)
+                        .orderByAsc(Order::getCreatedAt)
+        );
+
+        // 按父订单ID分组
+        return allChildOrders.stream()
+                .collect(Collectors.groupingBy(Order::getParentId));
+    }
+
+    /**
      * 批量预加载会员数据（包括子订单）
      *
+     * @param childOrderMap 子订单映射（父订单ID -> 子订单列表）
      * @param parentOrders 父订单列表
      * @return 会员ID -> 会员的映射
      */
-    private java.util.Map<Long, Member> preloadMembersWithChildren(List<Order> parentOrders) {
+    private java.util.Map<Long, Member> preloadMembersWithChildren(
+            java.util.Map<String, List<Order>> childOrderMap, List<Order> parentOrders) {
         // 收集所有会员ID（包括父订单和子订单）
         java.util.Set<Long> memberIds = new java.util.HashSet<>();
 
@@ -191,16 +247,8 @@ public class OrderServiceImpl implements OrderService {
                 .filter(id -> id != null)
                 .forEach(memberIds::add);
 
-        // 收集子订单的会员ID
-        for (Order parentOrder : parentOrders) {
-            if (parentOrder == null || parentOrder.getId() == null) {
-                continue;
-            }
-            List<Order> childOrders = orderMapper.selectList(
-                    new LambdaQueryWrapper<Order>()
-                            .eq(Order::getParentId, parentOrder.getId())
-                            .select(Order::getMemberId)  // 只查询会员ID字段，优化性能
-            );
+        // 收集子订单的会员ID（使用预加载的子订单数据）
+        for (List<Order> childOrders : childOrderMap.values()) {
             if (childOrders != null) {
                 childOrders.stream()
                         .filter(child -> child != null)
@@ -244,6 +292,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public PageResult<OrderInfoResponse> getHistoryOrders(OrderQueryRequest request) {
+        long startTime = System.currentTimeMillis();
         log.info("获取历史订单列表: request={}", request);
 
         // 构建查询条件
@@ -290,14 +339,21 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> page = new Page<>(request.getPage(), request.getPageSize());
         Page<Order> resultPage = orderMapper.selectPage(page, wrapper);
 
-        // 批量预加载数据，优化性能（包括父订单和子订单的会员数据）
+        // 批量预加载数据，优化性能
         List<Order> orders = resultPage.getRecords();
-        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(orders);
+
+        // 1. 批量预加载子订单
+        java.util.Map<String, List<Order>> childOrderMap = preloadChildOrders(orders);
+
+        // 2. 批量预加载会员数据（包括子订单）
+        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(childOrderMap, orders);
+
+        // 3. 批量预加载会员等级数据
         java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
 
         // 转换结果
         List<OrderInfoResponse> records = orders.stream()
-                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap))
+                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap, childOrderMap))
                 .collect(Collectors.toList());
 
         // 使用 PageResult.of 构建分页结果
@@ -308,7 +364,9 @@ public class OrderServiceImpl implements OrderService {
                 request.getPageSize()
         );
 
-        log.info("获取历史订单列表成功: total={}, totalPages={}", pageResult.getTotal(), pageResult.getTotalPages());
+        long endTime = System.currentTimeMillis();
+        log.info("获取历史订单列表成功: total={}, totalPages={},耗时={}ms",
+                pageResult.getTotal(), pageResult.getTotalPages(), endTime - startTime);
         return pageResult;
     }
 
@@ -345,10 +403,17 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 转换为订单信息响应（列表用，使用预加载数据）
+     *
+     * @param order 订单对象
+     * @param memberMap 会员映射（预加载）
+     * @param memberLevelMap 会员等级映射（预加载）
+     * @param childOrderMap 子订单映射（预加载，父订单ID -> 子订单列表）
+     * @return 订单信息响应
      */
     private OrderInfoResponse convertToInfoResponse(Order order,
                                                      java.util.Map<Long, Member> memberMap,
-                                                     java.util.Map<Long, MemberLevel> memberLevelMap) {
+                                                     java.util.Map<Long, MemberLevel> memberLevelMap,
+                                                     java.util.Map<String, List<Order>> childOrderMap) {
         OrderInfoResponse response = new OrderInfoResponse();
         response.setId(order.getId());
         response.setOrderNo(order.getId());
@@ -380,24 +445,26 @@ public class OrderServiceImpl implements OrderService {
         response.setCreatedAt(order.getCreatedAt());
         response.setParentId(order.getParentId());
 
-        // 查询子订单
-        List<Order> childOrders = orderMapper.selectList(
-                new LambdaQueryWrapper<Order>()
-                        .eq(Order::getParentId, order.getId())
-                        .orderByAsc(Order::getCreatedAt)
-        );
+        // 从预加载的子订单映射中获取子订单（仅父订单需要）
+        if (order.getParentId() == null && childOrderMap.containsKey(order.getId())) {
+            List<Order> childOrders = childOrderMap.get(order.getId());
 
-        // 设置续费次数（子订单数量减1，因为第一个子订单是初始订单）
-        if (childOrders != null && !childOrders.isEmpty()) {
-            response.setExtendCount(childOrders.size() - 1);
-            // 转换子订单列表
-            List<OrderInfoResponse> childOrderResponses = new ArrayList<>();
-            for (Order childOrder : childOrders) {
-                OrderInfoResponse childResponse = convertToInfoResponse(childOrder, memberMap, memberLevelMap);
-                childOrderResponses.add(childResponse);
+            // 设置续费次数（子订单数量减1，因为第一个子订单是初始订单）
+            if (childOrders != null && !childOrders.isEmpty()) {
+                response.setExtendCount(childOrders.size() - 1);
+                // 转换子订单列表
+                List<OrderInfoResponse> childOrderResponses = new ArrayList<>();
+                for (Order childOrder : childOrders) {
+                    // 子订单递归调用（不再包含子订单的子订单）
+                    OrderInfoResponse childResponse = convertChildOrderToInfoResponse(childOrder, memberMap, memberLevelMap);
+                    childOrderResponses.add(childResponse);
+                }
+                response.setChildOrders(childOrderResponses);
+            } else {
+                response.setExtendCount(0);
             }
-            response.setChildOrders(childOrderResponses);
-        } else {
+        } else if (order.getParentId() == null) {
+            // 没有子订单
             response.setExtendCount(0);
         }
 
