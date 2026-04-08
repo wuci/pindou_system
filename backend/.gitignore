@@ -1,39 +1,3 @@
-# IDE
-.idea/
-.vscode/
-*.iml
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Dependencies
-node_modules/
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Build outputs
-dist/
-build/
-target/
-*.exe
-*.dmg
-*.jar
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
-
 .idea/
 .settings
 target/
@@ -42,7 +6,6 @@ target/
 *.iml
 *.md
 dist/
-attribution_logs/*.log
 /tmp/
 /test/
 .cursor/
@@ -50,3 +13,4 @@ factor_result/
 *.csv
 *.lst
 inputFiles*
+target/classes

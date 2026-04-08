@@ -1,7 +1,0 @@
-com\pindou\timer\annotation\RequirePermission$Logical.class
-com\pindou\timer\util\JwtUtil.class
-com\pindou\timer\util\IpUtil.class
-com\pindou\timer\event\TableStatusChangeEvent.class
-com\pindou\timer\util\PasswordUtil.class
-com\pindou\timer\util\RedisUtil.class
-com\pindou\timer\annotation\RequirePermission.class
