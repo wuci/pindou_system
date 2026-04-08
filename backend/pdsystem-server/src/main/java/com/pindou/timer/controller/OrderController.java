@@ -51,6 +51,22 @@ public class OrderController extends ETSBaseController {
     }
 
     /**
+     * 获取进行中订单列表（分页）
+     */
+    @Operation(summary = "获取进行中订单列表")
+    @GetMapping("/active-now")
+    public Result<PageResult<OrderInfoResponse>> getActiveOrdersNow(
+            @RequestParam(required = false, defaultValue = "1") Integer page,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+
+        log.info("获取进行中订单列表请求: page={}, pageSize={}", page, pageSize);
+
+        PageResult<OrderInfoResponse> result = orderService.getActiveOrdersNow(page, pageSize);
+
+        return Result.success(result);
+    }
+
+    /**
      * 获取历史订单列表（分页）
      */
     @Operation(summary = "获取历史订单列表")

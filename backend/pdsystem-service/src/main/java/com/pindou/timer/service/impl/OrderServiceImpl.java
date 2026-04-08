@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.pindou.timer.common.exception.BusinessException;
 import com.pindou.timer.common.result.ErrorCode;
 import com.pindou.timer.common.result.PageResult;
+import com.pindou.timer.constants.TableConstants;
 import com.pindou.timer.dto.*;
 import com.pindou.timer.entity.Member;
 import com.pindou.timer.entity.MemberLevel;
@@ -69,6 +70,8 @@ public class OrderServiceImpl implements OrderService {
 
         // 构建查询条件
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        // 只查询父订单（parentId为NULL）
+        wrapper.isNull(Order::getParentId);
         // 查询当天已完成的订单
         wrapper.eq(Order::getStatus, "completed");
         // 查询创建时间在今天的订单
@@ -81,9 +84,9 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> pageObj = new Page<>(page, pageSize);
         Page<Order> resultPage = orderMapper.selectPage(pageObj, wrapper);
 
-        // 批量预加载数据，优化性能
+        // 批量预加载数据，优化性能（包括父订单和子订单的会员数据）
         List<Order> orders = resultPage.getRecords();
-        java.util.Map<Long, Member> memberMap = preloadMembers(orders);
+        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(orders);
         java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
 
         // 转换结果
@@ -101,6 +104,49 @@ public class OrderServiceImpl implements OrderService {
 
         long endTime = System.currentTimeMillis();
         log.info("获取当天已完成订单列表成功: total={}, totalPages={},耗时={}ms",
+                pageResult.getTotal(), pageResult.getTotalPages(), endTime - startTime);
+        return pageResult;
+    }
+
+    @Override
+    public PageResult<OrderInfoResponse> getActiveOrdersNow(Integer page, Integer pageSize) {
+        long startTime = System.currentTimeMillis();
+        log.info("获取进行中订单列表: page={}, pageSize={}", page, pageSize);
+
+        // 构建查询条件
+        LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
+        // 只查询父订单（parentId为NULL）
+        wrapper.isNull(Order::getParentId);
+        // 查询进行中的订单
+        wrapper.eq(Order::getStatus, TableConstants.OrderStatus.ACTIVE);
+
+        // 按创建时间倒序
+        wrapper.orderByDesc(Order::getCreatedAt);
+
+        // 分页查询
+        Page<Order> pageObj = new Page<>(page, pageSize);
+        Page<Order> resultPage = orderMapper.selectPage(pageObj, wrapper);
+
+        // 批量预加载数据，优化性能（包括父订单和子订单的会员数据）
+        List<Order> orders = resultPage.getRecords();
+        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(orders);
+        java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
+
+        // 转换结果
+        List<OrderInfoResponse> records = orders.stream()
+                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap))
+                .collect(Collectors.toList());
+
+        // 使用 PageResult.of 构建分页结果
+        PageResult<OrderInfoResponse> pageResult = PageResult.of(
+                records,
+                resultPage.getTotal(),
+                page,
+                pageSize
+        );
+
+        long endTime = System.currentTimeMillis();
+        log.info("获取进行中订单列表成功: total={}, totalPages={},耗时={}ms",
                 pageResult.getTotal(), pageResult.getTotalPages(), endTime - startTime);
         return pageResult;
     }
@@ -125,6 +171,51 @@ public class OrderServiceImpl implements OrderService {
 
         // 批量查询会员
         List<Member> members = memberMapper.selectBatchIds(memberIds);
+        return members.stream().collect(Collectors.toMap(Member::getId, m -> m, (a, b) -> a));
+    }
+
+    /**
+     * 批量预加载会员数据（包括子订单）
+     *
+     * @param parentOrders 父订单列表
+     * @return 会员ID -> 会员的映射
+     */
+    private java.util.Map<Long, Member> preloadMembersWithChildren(List<Order> parentOrders) {
+        // 收集所有会员ID（包括父订单和子订单）
+        java.util.Set<Long> memberIds = new java.util.HashSet<>();
+
+        // 收集父订单的会员ID
+        parentOrders.stream()
+                .filter(order -> order != null)
+                .map(Order::getMemberId)
+                .filter(id -> id != null)
+                .forEach(memberIds::add);
+
+        // 收集子订单的会员ID
+        for (Order parentOrder : parentOrders) {
+            if (parentOrder == null || parentOrder.getId() == null) {
+                continue;
+            }
+            List<Order> childOrders = orderMapper.selectList(
+                    new LambdaQueryWrapper<Order>()
+                            .eq(Order::getParentId, parentOrder.getId())
+                            .select(Order::getMemberId)  // 只查询会员ID字段，优化性能
+            );
+            if (childOrders != null) {
+                childOrders.stream()
+                        .filter(child -> child != null)
+                        .map(Order::getMemberId)
+                        .filter(id -> id != null)
+                        .forEach(memberIds::add);
+            }
+        }
+
+        if (memberIds.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        // 批量查询会员
+        List<Member> members = memberMapper.selectBatchIds(new java.util.ArrayList<>(memberIds));
         return members.stream().collect(Collectors.toMap(Member::getId, m -> m, (a, b) -> a));
     }
 
@@ -158,11 +249,18 @@ public class OrderServiceImpl implements OrderService {
         // 构建查询条件
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
 
-        // 状态筛选：如果未指定状态或选择"all"，查询所有状态的订单
+        // 只查询父订单（parentId为NULL）
+        wrapper.isNull(Order::getParentId);
+
+        // 状态筛选：
+        // 1. 如果指定了状态，按指定状态查询
+        // 2. 如果未指定状态或选择"all"，排除进行中的订单（只查询历史订单）
         if (StringUtils.isNotBlank(request.getStatus()) && !"all".equals(request.getStatus())) {
             wrapper.eq(Order::getStatus, request.getStatus());
+        } else {
+            // 排除进行中的订单
+            wrapper.ne(Order::getStatus, TableConstants.OrderStatus.ACTIVE);
         }
-        // status 为空或 "all" 时，不过滤状态，查询所有订单
 
         // 桌台筛选
         if (request.getTableId() != null) {
@@ -192,9 +290,14 @@ public class OrderServiceImpl implements OrderService {
         Page<Order> page = new Page<>(request.getPage(), request.getPageSize());
         Page<Order> resultPage = orderMapper.selectPage(page, wrapper);
 
+        // 批量预加载数据，优化性能（包括父订单和子订单的会员数据）
+        List<Order> orders = resultPage.getRecords();
+        java.util.Map<Long, Member> memberMap = preloadMembersWithChildren(orders);
+        java.util.Map<Long, MemberLevel> memberLevelMap = preloadMemberLevels(memberMap);
+
         // 转换结果
-        List<OrderInfoResponse> records = resultPage.getRecords().stream()
-                .map(this::convertToInfoResponse)
+        List<OrderInfoResponse> records = orders.stream()
+                .map(order -> convertToInfoResponse(order, memberMap, memberLevelMap))
                 .collect(Collectors.toList());
 
         // 使用 PageResult.of 构建分页结果
@@ -253,7 +356,21 @@ public class OrderServiceImpl implements OrderService {
         response.setTableName(order.getTableName());
         response.setStartTime(order.getStartTime());
         response.setEndTime(order.getEndTime());
-        response.setDuration(order.getDuration());
+
+        // 计算使用时长：进行中的订单需要动态计算
+        Integer duration = order.getDuration();
+        if (TableConstants.OrderStatus.ACTIVE.equals(order.getStatus())) {
+            // 进行中的订单：使用时长 = 当前时间 - 开始时间 - 暂停时长
+            long currentTime = System.currentTimeMillis();
+            long startTime = order.getStartTime() != null ? order.getStartTime() : currentTime;
+            int pauseDuration = order.getPauseDuration() != null ? order.getPauseDuration() : 0;
+            duration = (int) ((currentTime - startTime) / 1000) - pauseDuration;
+            // 确保使用时长不为负数
+            if (duration < 0) {
+                duration = 0;
+            }
+        }
+        response.setDuration(duration);
         response.setPauseDuration(order.getPauseDuration());
         response.setPresetDuration(order.getPresetDuration());
         response.setChannel(order.getChannel());
@@ -261,6 +378,28 @@ public class OrderServiceImpl implements OrderService {
         response.setOperatorName(order.getOperatorName());
         response.setPaidAt(order.getPaidAt());
         response.setCreatedAt(order.getCreatedAt());
+        response.setParentId(order.getParentId());
+
+        // 查询子订单
+        List<Order> childOrders = orderMapper.selectList(
+                new LambdaQueryWrapper<Order>()
+                        .eq(Order::getParentId, order.getId())
+                        .orderByAsc(Order::getCreatedAt)
+        );
+
+        // 设置续费次数（子订单数量减1，因为第一个子订单是初始订单）
+        if (childOrders != null && !childOrders.isEmpty()) {
+            response.setExtendCount(childOrders.size() - 1);
+            // 转换子订单列表
+            List<OrderInfoResponse> childOrderResponses = new ArrayList<>();
+            for (Order childOrder : childOrders) {
+                OrderInfoResponse childResponse = convertToInfoResponse(childOrder, memberMap, memberLevelMap);
+                childOrderResponses.add(childResponse);
+            }
+            response.setChildOrders(childOrderResponses);
+        } else {
+            response.setExtendCount(0);
+        }
 
         // 设置会员ID
         if (order.getMemberId() != null) {
@@ -325,7 +464,21 @@ public class OrderServiceImpl implements OrderService {
         response.setTableName(order.getTableName());
         response.setStartTime(order.getStartTime());
         response.setEndTime(order.getEndTime());
-        response.setDuration(order.getDuration());
+
+        // 计算使用时长：进行中的订单需要动态计算
+        Integer duration = order.getDuration();
+        if (TableConstants.OrderStatus.ACTIVE.equals(order.getStatus())) {
+            // 进行中的订单：使用时长 = 当前时间 - 开始时间 - 暂停时长
+            long currentTime = System.currentTimeMillis();
+            long startTime = order.getStartTime() != null ? order.getStartTime() : currentTime;
+            int pauseDuration = order.getPauseDuration() != null ? order.getPauseDuration() : 0;
+            duration = (int) ((currentTime - startTime) / 1000) - pauseDuration;
+            // 确保使用时长不为负数
+            if (duration < 0) {
+                duration = 0;
+            }
+        }
+        response.setDuration(duration);
         response.setPauseDuration(order.getPauseDuration());
         response.setPresetDuration(order.getPresetDuration());
         response.setChannel(order.getChannel());
@@ -333,6 +486,30 @@ public class OrderServiceImpl implements OrderService {
         response.setOperatorName(order.getOperatorName());
         response.setPaidAt(order.getPaidAt());
         response.setCreatedAt(order.getCreatedAt());
+        response.setParentId(order.getParentId());
+
+        // 查询子订单（仅父订单需要查询）
+        if (order.getParentId() == null) {
+            List<Order> childOrders = orderMapper.selectList(
+                    new LambdaQueryWrapper<Order>()
+                            .eq(Order::getParentId, order.getId())
+                            .orderByAsc(Order::getCreatedAt)
+            );
+
+            // 设置续费次数（子订单数量减1，因为第一个子订单是初始订单）
+            if (childOrders != null && !childOrders.isEmpty()) {
+                response.setExtendCount(childOrders.size() - 1);
+                // 转换子订单列表
+                List<OrderInfoResponse> childOrderResponses = new ArrayList<>();
+                for (Order childOrder : childOrders) {
+                    OrderInfoResponse childResponse = convertToInfoResponse(childOrder);
+                    childOrderResponses.add(childResponse);
+                }
+                response.setChildOrders(childOrderResponses);
+            } else {
+                response.setExtendCount(0);
+            }
+        }
 
         // 调试日志：打印订单的所有字段
         log.info("转换订单信息: orderId={}, memberId={}, originalAmount={}, amount={}",
@@ -419,7 +596,21 @@ public class OrderServiceImpl implements OrderService {
         response.setStartTime(order.getStartTime());
         response.setEndTime(order.getEndTime());
         response.setPaidAt(order.getPaidAt());
-        response.setDuration(order.getDuration());
+
+        // 计算使用时长：进行中的订单需要动态计算
+        Integer duration = order.getDuration();
+        if (TableConstants.OrderStatus.ACTIVE.equals(order.getStatus())) {
+            // 进行中的订单：使用时长 = 当前时间 - 开始时间 - 暂停时长
+            long currentTime = System.currentTimeMillis();
+            long startTime = order.getStartTime() != null ? order.getStartTime() : currentTime;
+            int pauseDuration = order.getPauseDuration() != null ? order.getPauseDuration() : 0;
+            duration = (int) ((currentTime - startTime) / 1000) - pauseDuration;
+            // 确保使用时长不为负数
+            if (duration < 0) {
+                duration = 0;
+            }
+        }
+        response.setDuration(duration);
         response.setPauseDuration(order.getPauseDuration());
         response.setPresetDuration(order.getPresetDuration());
         response.setStatus(order.getStatus());
@@ -429,7 +620,7 @@ public class OrderServiceImpl implements OrderService {
         response.setUpdatedAt(order.getUpdatedAt());
 
         // 计算计费时长
-        int actualDuration = order.getDuration() - order.getPauseDuration();
+        int actualDuration = duration - (order.getPauseDuration() != null ? order.getPauseDuration() : 0);
         response.setActualDuration(actualDuration);
 
         // 优先使用订单中存储的金额和金额明细，如果没有则重新计算
@@ -529,6 +720,63 @@ public class OrderServiceImpl implements OrderService {
                 order.getOtherPaymentAmount().doubleValue() : null);
         }
 
+        // 设置父订单ID
+        response.setParentId(order.getParentId());
+
+        // 查询子订单（仅父订单需要查询）
+        if (order.getParentId() == null) {
+            List<Order> childOrders = orderMapper.selectList(
+                new LambdaQueryWrapper<Order>()
+                    .eq(Order::getParentId, order.getId())
+                    .orderByAsc(Order::getCreatedAt)
+            );
+
+            // 设置续费次数（子订单数量减1，因为第一个子订单是初始订单）
+            if (childOrders != null && !childOrders.isEmpty()) {
+                response.setExtendCount(childOrders.size() - 1);
+
+                // 预加载子订单的会员数据和会员等级数据
+                java.util.Set<Long> memberIds = new java.util.HashSet<>();
+                java.util.Set<Long> memberLevelIds = new java.util.HashSet<>();
+                for (Order childOrder : childOrders) {
+                    if (childOrder.getMemberId() != null) {
+                        memberIds.add(childOrder.getMemberId());
+                    }
+                }
+
+                // 批量查询会员
+                java.util.Map<Long, Member> memberMap = new java.util.HashMap<>();
+                if (!memberIds.isEmpty()) {
+                    List<Member> members = memberService.listByIds(memberIds);
+                    for (Member member : members) {
+                        memberMap.put(member.getId(), member);
+                        if (member.getLevelId() != null) {
+                            memberLevelIds.add(member.getLevelId());
+                        }
+                    }
+                }
+
+                // 批量查询会员等级
+                java.util.Map<Long, MemberLevel> memberLevelMap = new java.util.HashMap<>();
+                if (!memberLevelIds.isEmpty()) {
+                    List<MemberLevel> memberLevels = memberLevelService.listByIds(memberLevelIds);
+                    for (MemberLevel memberLevel : memberLevels) {
+                        memberLevelMap.put(memberLevel.getId(), memberLevel);
+                    }
+                }
+
+                // 转换子订单列表
+                List<OrderInfoResponse> childOrderResponses = new ArrayList<>();
+                for (Order childOrder : childOrders) {
+                    OrderInfoResponse childResponse = convertChildOrderToInfoResponse(childOrder, memberMap, memberLevelMap);
+                    childOrderResponses.add(childResponse);
+                }
+                response.setChildOrders(childOrderResponses);
+            } else {
+                response.setExtendCount(0);
+            }
+        }
+
         // 构建时间线
         List<TimeLineItem> timeLine = buildTimeLine(order);
         response.setTimeLine(timeLine);
@@ -572,5 +820,84 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return timeLine;
+    }
+
+    /**
+     * 转换子订单为订单信息响应（不包含子订单的子订单）
+     */
+    private OrderInfoResponse convertChildOrderToInfoResponse(Order order,
+                                                             java.util.Map<Long, Member> memberMap,
+                                                             java.util.Map<Long, MemberLevel> memberLevelMap) {
+        OrderInfoResponse response = new OrderInfoResponse();
+        response.setId(order.getId());
+        response.setOrderNo(order.getId());
+        response.setTableId(order.getTableId());
+        response.setTableName(order.getTableName());
+        response.setStartTime(order.getStartTime());
+        response.setEndTime(order.getEndTime());
+
+        // 计算使用时长：进行中的订单需要动态计算
+        Integer duration = order.getDuration();
+        if (TableConstants.OrderStatus.ACTIVE.equals(order.getStatus())) {
+            // 进行中的订单：使用时长 = 当前时间 - 开始时间 - 暂停时长
+            long currentTime = System.currentTimeMillis();
+            long startTime = order.getStartTime() != null ? order.getStartTime() : currentTime;
+            int pauseDuration = order.getPauseDuration() != null ? order.getPauseDuration() : 0;
+            duration = (int) ((currentTime - startTime) / 1000) - pauseDuration;
+            // 确保使用时长不为负数
+            if (duration < 0) {
+                duration = 0;
+            }
+        }
+        response.setDuration(duration);
+        response.setPauseDuration(order.getPauseDuration());
+        response.setPresetDuration(order.getPresetDuration());
+        response.setChannel(order.getChannel());
+        response.setStatus(order.getStatus());
+        response.setOperatorName(order.getOperatorName());
+        response.setPaidAt(order.getPaidAt());
+        response.setCreatedAt(order.getCreatedAt());
+        response.setParentId(order.getParentId());
+
+        // 设置会员ID
+        if (order.getMemberId() != null) {
+            response.setMemberId(order.getMemberId());
+        }
+
+        // 优先使用订单中存储的金额
+        if (order.getAmount() != null && order.getAmount().doubleValue() > 0) {
+            response.setAmount(order.getAmount().doubleValue());
+
+            // 设置原价
+            if (order.getOriginalAmount() != null && order.getOriginalAmount().doubleValue() > 0) {
+                response.setOriginalAmount(order.getOriginalAmount().doubleValue());
+            }
+        }
+
+        // 设置会员信息（使用预加载的数据）
+        if (order.getMemberId() != null && memberMap.containsKey(order.getMemberId())) {
+            Member member = memberMap.get(order.getMemberId());
+            response.setMemberName(member.getName());
+
+            // 设置会员等级信息（使用预加载的数据）
+            if (member.getLevelId() != null && memberLevelMap.containsKey(member.getLevelId())) {
+                MemberLevel memberLevel = memberLevelMap.get(member.getLevelId());
+                response.setMemberLevelName(memberLevel.getName());
+                if (memberLevel.getDiscountRate() != null) {
+                    response.setMemberDiscountRate(memberLevel.getDiscountRate().doubleValue());
+                }
+            }
+        }
+
+        // 设置支付方式信息
+        if (order.getPaymentMethod() != null) {
+            response.setPaymentMethod(order.getPaymentMethod());
+            response.setBalanceAmount(order.getBalanceAmount() != null ?
+                order.getBalanceAmount().doubleValue() : null);
+            response.setOtherPaymentAmount(order.getOtherPaymentAmount() != null ?
+                order.getOtherPaymentAmount().doubleValue() : null);
+        }
+
+        return response;
     }
 }

@@ -623,6 +623,7 @@ public class TableServiceImpl implements TableService {
     public TableInfoResponse extendTimer(Integer tableId, ExtendTableRequest request, String userId, String username) {
         log.info("续费时长: tableId={}, additionalDuration={}, userId={}", tableId, request.getAdditionalDuration(), userId);
 
+        // 1. 验证桌台和订单
         Table table = tableMapper.selectById(tableId);
         if (table == null) {
             throw new BusinessException(ErrorCode.TABLE_NOT_FOUND);
@@ -632,36 +633,40 @@ public class TableServiceImpl implements TableService {
             throw new BusinessException(ErrorCode.TABLE_STATUS_ERROR);
         }
 
-        Order order = orderMapper.selectOne(
+        Order currentOrder = orderMapper.selectOne(
                 new LambdaQueryWrapper<Order>().eq(Order::getId, table.getCurrentOrderId())
         );
-        if (order == null) {
+        if (currentOrder == null) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
 
-        ExtendCalculationResult extendCalc = calculateExtendAmount(order, request);
+        // 2. 计算续费金额
+        ExtendCalculationResult extendCalc = calculateExtendAmount(currentOrder, request);
 
-        updateOrderForExtend(order, request, extendCalc);
-        orderMapper.updateById(order);
+        // 3. 判断是否为首次续费（通过查询是否存在子订单）
+        boolean isFirstExtend = isFirstExtend(currentOrder);
 
-        // 记录折扣信息到Redis
-        if (extendCalc.getDiscountId() != null && extendCalc.getDiscountRate() != null) {
-            discountRecordService.addDiscountRecord(order.getId(), extendCalc.getDiscountId(), extendCalc.getDiscountRate());
+        if (isFirstExtend) {
+            // 首次续费：重构为父子订单结构
+            log.info("首次续费，开始重构订单结构: orderId={}", currentOrder.getId());
+            handleFirstExtend(currentOrder, table, request, extendCalc, userId, username);
+        } else {
+            // 后续续费：创建新的子订单
+            log.info("后续续费，创建新的子订单: orderId={}", currentOrder.getId());
+            handleSubsequentExtend(currentOrder, table, request, extendCalc, userId, username);
         }
 
-        updateTableForExtend(table, extendCalc.getNewPresetDuration());
-        tableMapper.updateById(table);
-
+        // 4. 推送状态变更事件
         eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
 
-        log.info("续费时长成功: tableId={}, newPresetDuration={}, newTotalAmount={}",
-                tableId, extendCalc.getNewPresetDuration(), extendCalc.getNewTotalAmount());
+        log.info("续费时长成功: tableId={}", tableId);
 
         return convertToResponse(table);
     }
 
     /**
      * 计算续费金额
+     * 注意：返回的金额只是本次续费的实际金额，不包含原订单金额
      */
     private ExtendCalculationResult calculateExtendAmount(Order order, ExtendTableRequest request) {
         String extendChannel = request.getChannel() != null ? request.getChannel() : order.getChannel();
@@ -702,25 +707,17 @@ public class TableServiceImpl implements TableService {
             log.info("使用渠道 {} 计算续费费用: additionalDuration={}秒, extendFee={}", extendChannel, request.getAdditionalDuration(), extendFee);
         }
 
-        double currentAmount = order.getAmount() != null ? order.getAmount().doubleValue() : 0.0;
-        double currentOriginalAmount = order.getOriginalAmount() != null ? order.getOriginalAmount().doubleValue() : 0.0;
-
-        if (currentOriginalAmount == 0) {
-            currentOriginalAmount = currentAmount;
-        }
-
-        double newOriginalAmount = currentOriginalAmount + extendFee;
-
-        // 计算续费折扣信息
-        ExtendDiscountCalculation discountCalc = calculateExtendDiscount(request, order, newOriginalAmount);
-        double newTotalAmount = discountCalc.getFinalAmount();
+        // 计算本次续费折扣（基于本次续费的原价extendFee）
+        ExtendDiscountCalculation discountCalc = calculateExtendDiscount(request, order, extendFee);
+        double finalAmount = discountCalc.getFinalAmount();
 
         Integer currentPresetDuration = order.getPresetDuration();
         Integer newPresetDuration = currentPresetDuration == null
                 ? (request.getAdditionalDuration() == 0 ? null : request.getAdditionalDuration())
                 : (request.getAdditionalDuration() == 0 ? null : currentPresetDuration + request.getAdditionalDuration());
 
-        return new ExtendCalculationResult(newOriginalAmount, newTotalAmount, newPresetDuration,
+        // 返回本次续费的实际金额，不累加原订单金额
+        return new ExtendCalculationResult(extendFee, finalAmount, newPresetDuration,
                 discountCalc.getDiscountId(), discountCalc.getDiscountRate());
     }
 
@@ -757,26 +754,21 @@ public class TableServiceImpl implements TableService {
     private ExtendDiscountCalculation calculateExtendDiscount(ExtendTableRequest request, Order order, double newOriginalAmount) {
         // 判断是否应用新的活动折扣
         if (request.getDiscountId() != null && !request.getDiscountId().isEmpty()) {
-            // 获取Redis中已有的折扣率列表
-            List<BigDecimal> existingRates = discountRecordService.getDiscountRates(order.getId());
-
-            // 获取新折扣的折扣率
+            // 续费折扣计算：只针对本次续费，不混入历史折扣
             CalculateDiscountResponse discountResponse = discountService.calculateDiscountById(
                     request.getDiscountId(),
                     BigDecimal.valueOf(newOriginalAmount),
                     request.getMemberId()
             );
             if (discountResponse != null && discountResponse.getFinalAmount() != null) {
-                BigDecimal newDiscountRate = discountResponse.getDiscountRate();
-                // 使用Redis服务计算平均折扣率
-                BigDecimal averageRate = discountRecordService.calculateAverageRate(existingRates, newDiscountRate);
-                // 用平均折扣率计算最终金额：原价 × 平均折扣率
-                double finalAmount = newOriginalAmount * averageRate.doubleValue();
+                // 直接使用本次折扣率，不计算平均折扣率
+                double finalAmount = discountResponse.getFinalAmount().doubleValue();
+                BigDecimal discountRate = discountResponse.getDiscountRate();
 
-                log.info("续费应用活动折扣: originalAmount={}, finalAmount={}, newDiscountRate={}, averageRate={}, existingCount={}",
-                        newOriginalAmount, finalAmount, newDiscountRate, averageRate, existingRates.size());
+                log.info("续费应用活动折扣: originalAmount={}, finalAmount={}, discountRate={}",
+                        newOriginalAmount, finalAmount, discountRate);
 
-                return new ExtendDiscountCalculation(finalAmount, request.getDiscountId(), newDiscountRate);
+                return new ExtendDiscountCalculation(finalAmount, request.getDiscountId(), discountRate);
             }
         }
 
@@ -819,6 +811,269 @@ public class TableServiceImpl implements TableService {
         table.setUpdatedAt(System.currentTimeMillis());
     }
 
+    /**
+     * 判断是否为首次续费
+     * 规则：当前订单没有子订单则为首次续费
+     *
+     * @param order 当前订单
+     * @return true-首次续费，false-后续续费
+     */
+    private boolean isFirstExtend(Order order) {
+        // 查询是否存在以当前订单为父订单的子订单
+        Long childCount = orderMapper.selectCount(
+                new LambdaQueryWrapper<Order>()
+                        .eq(Order::getParentId, order.getId())
+        );
+        return childCount == 0;
+    }
+
+    /**
+     * 查找父订单
+     * 如果当前订单是子订单，返回其父订单；否则返回当前订单本身
+     *
+     * @param order 当前订单
+     * @return 父订单
+     */
+    private Order findParentOrder(Order order) {
+        if (order.getParentId() != null) {
+            // 当前是子订单，查询父订单
+            return orderMapper.selectById(order.getParentId());
+        } else {
+            // 当前就是父订单
+            return order;
+        }
+    }
+
+    /**
+     * 构建子订单
+     * 子订单记录单次续费的详细信息
+     *
+     * @param referenceOrder 参考订单（父订单或原订单）
+     * @param request 续费请求
+     * @param extendCalc 续费计算结果
+     * @param userId 用户ID
+     * @param username 用户名
+     * @param parentId 父订单ID
+     * @param now 当前时间戳
+     * @return 子订单
+     */
+    private Order buildChildOrder(Order referenceOrder, ExtendTableRequest request, ExtendCalculationResult extendCalc,
+                                  String userId, String username, String parentId, long now) {
+        Order childOrder = new Order();
+        childOrder.setId(IdUtil.simpleUUID());
+        childOrder.setTableId(referenceOrder.getTableId());
+        childOrder.setTableName(referenceOrder.getTableName());
+        childOrder.setStartTime(now);
+        childOrder.setParentId(parentId); // 设置父订单ID
+        childOrder.setDuration(request.getAdditionalDuration());
+        childOrder.setPresetDuration(request.getAdditionalDuration() == 0 ? null : request.getAdditionalDuration());
+        childOrder.setOriginalAmount(BigDecimal.valueOf(extendCalc.getNewOriginalAmount()));
+        childOrder.setAmount(BigDecimal.valueOf(extendCalc.getNewTotalAmount()));
+        // 设置金额明细JSON
+        childOrder.setAmountDetail(buildSimpleAmountDetailJson(extendCalc.getNewTotalAmount()));
+        childOrder.setMemberId(request.getMemberId() != null ? request.getMemberId() : referenceOrder.getMemberId());
+        childOrder.setChannel(request.getChannel() != null ? request.getChannel() : referenceOrder.getChannel());
+        childOrder.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : referenceOrder.getPaymentMethod());
+        childOrder.setStatus(TableConstants.OrderStatus.ACTIVE);
+        childOrder.setOperatorId(userId);
+        childOrder.setOperatorName(username);
+        childOrder.setCreatedAt(now);
+        childOrder.setUpdatedAt(now);
+        return childOrder;
+    }
+
+    /**
+     * 首次续费：将单订单重构为父子订单结构
+     * 执行步骤：
+     * 1. 创建父订单（汇总订单）
+     * 2. 将原订单转为子订单1
+     * 3. 创建新的子订单2（续费订单）
+     * 4. 更新桌台关联到父订单
+     *
+     * @param originalOrder 原订单
+     * @param table 桌台
+     * @param request 续费请求
+     * @param extendCalc 续费计算结果
+     * @param userId 用户ID
+     * @param username 用户名
+     */
+    /**
+     * 首次续费：创建父子订单结构
+     * 执行步骤：
+     * 1. 创建子订单1（复制原订单的初始下单数据）
+     * 2. 创建子订单2（续费订单的实际数据）
+     * 3. 更新原订单为父订单（汇总统计，保持active状态）
+     * 4. 更新桌台（current_order_id继续指向原订单）
+     *
+     * @param originalOrder 原订单
+     * @param table 桌台
+     * @param request 续费请求
+     * @param extendCalc 续费计算结果
+     * @param userId 用户ID
+     * @param username 用户名
+     */
+    private void handleFirstExtend(Order originalOrder, Table table, ExtendTableRequest request,
+                                   ExtendCalculationResult extendCalc, String userId, String username) {
+        long now = System.currentTimeMillis();
+
+        // Step 1: 创建子订单1（复制原订单的初始下单数据）
+        Order childOrder1 = buildChildOrderFromOriginal(originalOrder, originalOrder.getId(), now);
+        orderMapper.insert(childOrder1);
+
+        // Step 2: 创建子订单2（续费订单的实际数据）
+        Order childOrder2 = buildChildOrder(originalOrder, request, extendCalc, userId, username, originalOrder.getId(), now);
+        orderMapper.insert(childOrder2);
+
+        // Step 3: 更新原订单为父订单（汇总统计，保持active状态）
+        updateOriginalOrderToParent(originalOrder, extendCalc, now);
+        orderMapper.updateById(originalOrder);
+
+        // Step 4: 更新桌台（current_order_id继续指向原订单，保持不变）
+        updateTableForExtend(table, extendCalc.getNewPresetDuration());
+        tableMapper.updateById(table);
+
+        // Step 5: 记录折扣信息（应用到子订单2）
+        if (extendCalc.getDiscountId() != null && extendCalc.getDiscountRate() != null) {
+            discountRecordService.addDiscountRecord(childOrder2.getId(), extendCalc.getDiscountId(), extendCalc.getDiscountRate());
+        }
+
+        log.info("首次续费完成，原订单转为父订单: parentOrderId={}, childOrder1Id={}, childOrder2Id={}",
+                originalOrder.getId(), childOrder1.getId(), childOrder2.getId());
+    }
+
+    /**
+     * 更新原订单为父订单（汇总统计）
+     * 更新汇总金额和时长，状态保持active
+     *
+     * @param originalOrder 原订单
+     * @param extendCalc 续费计算结果
+     * @param now 当前时间戳
+     */
+    private void updateOriginalOrderToParent(Order originalOrder, ExtendCalculationResult extendCalc, long now) {
+        // 计算汇总金额
+        BigDecimal totalOriginalAmount = originalOrder.getOriginalAmount()
+                .add(BigDecimal.valueOf(extendCalc.getNewOriginalAmount()));
+        BigDecimal totalAmount = originalOrder.getAmount()
+                .add(BigDecimal.valueOf(extendCalc.getNewTotalAmount()));
+
+        // 更新汇总金额
+        originalOrder.setOriginalAmount(totalOriginalAmount);
+        originalOrder.setAmount(totalAmount);
+        originalOrder.setAmountDetail(buildSimpleAmountDetailJson(totalAmount.doubleValue()));
+
+        // 更新预设时长
+        originalOrder.setPresetDuration(extendCalc.getNewPresetDuration());
+
+        // 状态保持active，不修改
+        originalOrder.setUpdatedAt(now);
+    }
+
+    /**
+     * 从原订单构建子订单（用于首次续费时）
+     * 复制原订单的所有内容，但设置新的ID和parent_id
+     *
+     * @param originalOrder 原订单
+     * @param parentId 父订单ID
+     * @param now 当前时间戳
+     * @return 子订单
+     */
+    private Order buildChildOrderFromOriginal(Order originalOrder, String parentId, long now) {
+        Order childOrder = new Order();
+        childOrder.setId(IdUtil.simpleUUID());
+        childOrder.setTableId(originalOrder.getTableId());
+        childOrder.setTableName(originalOrder.getTableName());
+        childOrder.setStartTime(originalOrder.getStartTime());
+        childOrder.setParentId(parentId); // 设置父订单ID
+        childOrder.setEndTime(originalOrder.getEndTime());
+        childOrder.setDuration(originalOrder.getDuration());
+        childOrder.setPauseDuration(originalOrder.getPauseDuration());
+        childOrder.setPresetDuration(originalOrder.getPresetDuration());
+        childOrder.setStatus(TableConstants.OrderStatus.ACTIVE);
+        childOrder.setOriginalAmount(originalOrder.getOriginalAmount());
+        childOrder.setAmount(originalOrder.getAmount());
+        childOrder.setAmountDetail(originalOrder.getAmountDetail());
+        childOrder.setMemberId(originalOrder.getMemberId());
+        childOrder.setChannel(originalOrder.getChannel());
+        childOrder.setPaymentMethod(originalOrder.getPaymentMethod());
+        childOrder.setBalanceAmount(originalOrder.getBalanceAmount());
+        childOrder.setOtherPaymentAmount(originalOrder.getOtherPaymentAmount());
+        childOrder.setOperatorId(originalOrder.getOperatorId());
+        childOrder.setOperatorName(originalOrder.getOperatorName());
+        childOrder.setCreatedAt(originalOrder.getCreatedAt());
+        childOrder.setUpdatedAt(now);
+        return childOrder;
+    }
+
+    /**
+     * 后续续费：创建新的子订单并更新父订单汇总
+     * 执行步骤：
+     * 1. 查找父订单
+     * 2. 创建新的子订单（记录当前这次续费的实际数据）
+     * 3. 更新父订单的汇总金额和时长
+     * 4. 更新桌台
+     *
+     * @param currentOrder 当前订单
+     * @param table 桌台
+     * @param request 续费请求
+     * @param extendCalc 续费计算结果
+     * @param userId 用户ID
+     * @param username 用户名
+     */
+    private void handleSubsequentExtend(Order currentOrder, Table table, ExtendTableRequest request,
+                                        ExtendCalculationResult extendCalc, String userId, String username) {
+        // Step 1: 查找父订单
+        Order parentOrder = findParentOrder(currentOrder);
+        if (parentOrder == null) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, "找不到父订单");
+        }
+
+        // Step 2: 创建新子订单（记录当前这次续费的实际数据）
+        Order newChildOrder = buildChildOrder(parentOrder, request, extendCalc, userId, username,
+                parentOrder.getId(), System.currentTimeMillis());
+        orderMapper.insert(newChildOrder);
+
+        // Step 3: 更新父订单的汇总金额和时长
+        updateParentOrderSummary(parentOrder, newChildOrder, extendCalc.getNewPresetDuration());
+        orderMapper.updateById(parentOrder);
+
+        // Step 4: 更新桌台
+        updateTableForExtend(table, extendCalc.getNewPresetDuration());
+        tableMapper.updateById(table);
+
+        // Step 5: 记录折扣信息
+        if (extendCalc.getDiscountId() != null && extendCalc.getDiscountRate() != null) {
+            discountRecordService.addDiscountRecord(newChildOrder.getId(), extendCalc.getDiscountId(), extendCalc.getDiscountRate());
+        }
+
+        log.info("后续续费完成: parentOrderId={}, newChildOrderId={}, totalAmount={}",
+                parentOrder.getId(), newChildOrder.getId(), parentOrder.getAmount());
+    }
+
+    /**
+     * 更新父订单的汇总金额和时长
+     *
+     * @param parentOrder 父订单
+     * @param newChildOrder 新创建的子订单
+     * @param newPresetDuration 新的预设时长
+     */
+    private void updateParentOrderSummary(Order parentOrder, Order newChildOrder, Integer newPresetDuration) {
+        // 累加子订单的金额到父订单
+        BigDecimal totalOriginalAmount = parentOrder.getOriginalAmount()
+                .add(newChildOrder.getOriginalAmount());
+        BigDecimal totalAmount = parentOrder.getAmount()
+                .add(newChildOrder.getAmount());
+
+        // 更新父订单的汇总金额
+        parentOrder.setOriginalAmount(totalOriginalAmount);
+        parentOrder.setAmount(totalAmount);
+        parentOrder.setAmountDetail(buildSimpleAmountDetailJson(totalAmount.doubleValue()));
+
+        // 更新预设时长
+        parentOrder.setPresetDuration(newPresetDuration);
+
+        parentOrder.setUpdatedAt(System.currentTimeMillis());
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void ignoreRemind(Integer tableId, String userId, String username) {
@@ -851,6 +1106,9 @@ public class TableServiceImpl implements TableService {
                 processOrderEndTimer(order, table, request, memberId, now);
                 orderMapper.updateById(order);
 
+                // 同步更新所有子订单的状态
+                updateChildOrdersStatus(order.getId(), order.getStatus(), now);
+
                 updateMemberTotalAmountIfNeeded(memberId, order.getOriginalAmount(), order.getStatus());
 
                 // 清除Redis中的折扣记录
@@ -862,6 +1120,36 @@ public class TableServiceImpl implements TableService {
         eventPublisher.publishEvent(new TableStatusChangeEvent(this, tableId));
 
         log.info("结束计时成功: tableId={}", tableId);
+    }
+
+    /**
+     * 同步更新所有子订单的状态
+     *
+     * @param parentOrderId 父订单ID
+     * @param status 父订单的状态
+     * @param now 当前时间戳
+     */
+    private void updateChildOrdersStatus(String parentOrderId, String status, long now) {
+        // 查询所有子订单
+        List<Order> childOrders = orderMapper.selectList(
+                new LambdaQueryWrapper<Order>()
+                        .eq(Order::getParentId, parentOrderId)
+        );
+
+        if (childOrders == null || childOrders.isEmpty()) {
+            log.info("父订单 {} 没有子订单，无需更新状态", parentOrderId);
+            return;
+        }
+
+        // 批量更新子订单状态
+        for (Order childOrder : childOrders) {
+            childOrder.setStatus(status);
+            childOrder.setEndTime(now);
+            childOrder.setUpdatedAt(now);
+            orderMapper.updateById(childOrder);
+        }
+
+        log.info("已更新 {} 个子订单的状态为: {}", childOrders.size(), status);
     }
 
     /**

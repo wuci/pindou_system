@@ -21,6 +21,15 @@ public class OrderDetailResponse implements Serializable {
     @Schema(description = "订单ID")
     private String id;
 
+    @Schema(description = "父订单ID（NULL表示为父订单/独立订单）")
+    private String parentId;
+
+    @Schema(description = "续费次数（子订单数量）")
+    private Integer extendCount;
+
+    @Schema(description = "子订单列表（仅父订单包含）")
+    private List<OrderInfoResponse> childOrders;
+
     @Schema(description = "桌台编号")
     private Integer tableId;
 

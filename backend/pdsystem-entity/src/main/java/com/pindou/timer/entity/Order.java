@@ -25,6 +25,10 @@ public class Order implements Serializable {
     @TableField(typeHandler = org.apache.ibatis.type.StringTypeHandler.class)
     private String id;
 
+    @Schema(description = "父订单ID（NULL表示为父订单/独立订单）")
+    @TableField("parent_order_id")
+    private String parentId;
+
     @Schema(description = "桌台ID")
     @TableField("table_id")
     private Integer tableId;

@@ -23,17 +23,17 @@
               {{ detail.status === 'active' ? '进行中' : '已完成' }}
             </el-tag>
           </div>
+          <div v-if="detail.extendCount && detail.extendCount > 0" class="info-item">
+            <span class="label">续费次数</span>
+            <el-tag type="warning" size="small">{{ detail.extendCount }}次</el-tag>
+          </div>
           <div class="info-item">
             <span class="label">操作员</span>
             <span class="value">{{ detail.operatorName }}</span>
           </div>
           <div class="info-item">
             <span class="label">套餐时长</span>
-            <span class="value">{{ detail.presetDuration ? formatDuration(detail.presetDuration) : '不设时长' }}</span>
-          </div>
-          <div v-if="detail.channel" class="info-item">
-            <span class="label">渠道</span>
-            <el-tag type="primary" size="small">{{ getChannelName(detail.channel) }}</el-tag>
+            <span class="value">{{ detail.presetDuration ? formatDuration(detail.presetDuration ?? 0) : '不设时长' }}</span>
           </div>
         </div>
       </section>
@@ -52,15 +52,15 @@
           </div>
           <div class="info-item">
             <span class="label">使用时长</span>
-            <span class="value highlight">{{ formatDuration(detail.duration) }}</span>
+            <span class="value highlight">{{ formatDuration(detail.duration ?? 0) }}</span>
           </div>
           <div class="info-item">
             <span class="label">暂停时长</span>
-            <span class="value">{{ formatDuration(detail.pauseDuration) }}</span>
+            <span class="value">{{ formatDuration(detail.pauseDuration ?? 0) }}</span>
           </div>
           <div class="info-item">
             <span class="label">计费时长</span>
-            <span class="value highlight">{{ formatDuration(detail.actualDuration) }}</span>
+            <span class="value highlight">{{ formatDuration(detail.actualDuration ?? 0) }}</span>
           </div>
         </div>
       </section>
@@ -69,7 +69,7 @@
       <section class="detail-section">
         <h3 class="section-title">费用明细</h3>
         <div class="amount-list">
-          <div v-if="detail.originalAmount && detail.originalAmount > detail.amount" class="amount-item">
+          <div v-if="detail.originalAmount && detail.originalAmount > (detail.amount ?? 0)" class="amount-item">
             <span class="label">原价</span>
             <span class="value original">¥{{ formatMoney(detail.originalAmount) }}</span>
           </div>
@@ -131,7 +131,61 @@
           </div>
           <div v-if="detail.memberDiscountRate" class="info-item">
             <span class="label">折扣率</span>
-            <span class="value discount">{{ (detail.memberDiscountRate * 10).toFixed(1) }}折</span>
+            <span class="value discount">{{ formatDiscountRate(detail.memberDiscountRate) }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 子订单列表 -->
+      <section v-if="detail.childOrders && detail.childOrders.length > 0" class="detail-section">
+        <h3 class="section-title">子订单列表（共{{ detail.childOrders.length }}笔）</h3>
+        <div class="child-orders-list">
+          <div
+            v-for="(childOrder, index) in detail.childOrders"
+            :key="childOrder.id"
+            class="child-order-card"
+          >
+            <div class="child-order-header">
+              <span class="child-order-title">子订单 {{ index + 1 }}</span>
+              <el-tag :type="childOrder.status === 'active' ? 'success' : 'info'" size="small">
+                {{ childOrder.status === 'active' ? '进行中' : '已完成' }}
+              </el-tag>
+            </div>
+            <div class="child-order-body">
+              <div class="child-order-row">
+                <span class="label">订单编号</span>
+                <span class="value">{{ childOrder.orderNo || childOrder.id }}</span>
+              </div>
+              <div v-if="childOrder.channel" class="child-order-row">
+                <span class="label">渠道</span>
+                <el-tag type="primary" size="small">{{ getChannelName(childOrder.channel || 'store') }}</el-tag>
+              </div>
+              <div v-if="childOrder.presetDuration" class="child-order-row">
+                <span class="label">套餐时长</span>
+                <span class="value">{{ formatDuration(childOrder.presetDuration ?? 0) }}</span>
+              </div>
+              <div class="child-order-row">
+                <span class="label">费用</span>
+                <span class="value amount">¥{{ formatMoney(childOrder.amount ?? 0) }}</span>
+              </div>
+              <div v-if="childOrder.memberName" class="child-order-row">
+                <span class="label">会员</span>
+                <span class="value">{{ childOrder.memberName }}</span>
+                <el-tag v-if="childOrder.memberDiscountRate" type="success" size="small" style="margin-left: 8px">
+                  {{ formatDiscountRate(childOrder.memberDiscountRate) }}
+                </el-tag>
+              </div>
+              <div v-if="childOrder.paymentMethod" class="child-order-row">
+                <span class="label">支付方式</span>
+                <el-tag :type="getPaymentMethodTagType(childOrder.paymentMethod)" size="small">
+                  {{ getPaymentMethodLabel(childOrder.paymentMethod) }}
+                </el-tag>
+              </div>
+              <div class="child-order-row">
+                <span class="label">开始时间</span>
+                <span class="value time">{{ formatDateTime(childOrder.startTime) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -178,7 +232,7 @@ onMounted(async () => {
 
 /**
  * 订单详情抽屉组件
- * 用于展示订单的详细信息，包括基本信息、时间信息、费用明细和操作时间线
+ * 用于展示订单的详细信息，包括基本信息、时间信息、费用明细、子订单列表和操作时间线
  */
 interface Props {
   modelValue: boolean
@@ -241,8 +295,8 @@ const formatDateTime = (timestamp: number) => {
   })
 }
 
-const formatDuration = (seconds: number) => {
-  if (!seconds) return '0秒'
+const formatDuration = (seconds: number | null | undefined) => {
+  if (seconds === null || seconds === undefined || seconds === 0) return '0秒'
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = seconds % 60
@@ -255,8 +309,14 @@ const formatDuration = (seconds: number) => {
   return parts.join('')
 }
 
-const formatMoney = (amount: number) => {
+const formatMoney = (amount: number | null | undefined) => {
+  if (amount === null || amount === undefined) return '0.00'
   return amount.toFixed(2)
+}
+
+const formatDiscountRate = (rate: number | null | undefined) => {
+  if (rate === null || rate === undefined) return '-'
+  return (rate * 10).toFixed(1) + '折'
 }
 
 // 获取支付方式标签
@@ -408,6 +468,67 @@ const getPaymentMethodTagType = (method: string): 'success' | 'primary' | 'info'
   color: #ffffff;
   font-size: 20px;
   font-weight: 700;
+}
+
+.child-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.child-order-card {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafbfc;
+}
+
+.child-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.child-order-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.child-order-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.child-order-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.child-order-row .label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.child-order-row .value {
+  font-size: 14px;
+  color: #303133;
+}
+
+.child-order-row .value.amount {
+  font-weight: 600;
+  color: #e6a23c;
+}
+
+.child-order-row .value.time {
+  font-size: 12px;
+  color: #606266;
 }
 
 .timeline-content {

@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 订单信息响应DTO（用于列表展示）
@@ -22,6 +23,12 @@ public class OrderInfoResponse implements Serializable {
 
     @Schema(description = "订单编号")
     private String orderNo;
+
+    @Schema(description = "父订单ID（NULL表示为父订单/独立订单）")
+    private String parentId;
+
+    @Schema(description = "续费次数（子订单数量）")
+    private Integer extendCount;
 
     @Schema(description = "桌台编号")
     private Integer tableId;
@@ -88,4 +95,7 @@ public class OrderInfoResponse implements Serializable {
 
     @Schema(description = "创建时间（毫秒时间戳）")
     private Long createdAt;
+
+    @Schema(description = "子订单列表（仅父订单包含）")
+    private List<OrderInfoResponse> childOrders;
 }

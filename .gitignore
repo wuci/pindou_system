@@ -33,3 +33,19 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+.idea/
+.settings
+target
+.classpath
+.project
+*.iml
+*.md
+dist/
+attribution_logs/*.log
+/tmp/
+/test/
+.cursor/
+factor_result/
+*.csv
+*.lst

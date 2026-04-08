@@ -29,6 +29,9 @@ export interface OrderInfo {
   paymentMethod?: string  // 支付方式
   balanceAmount?: number  // 余额支付金额
   otherPaymentAmount?: number  // 其他方式支付金额
+  parentId?: string | null  // 父订单ID
+  extendCount?: number  // 续费次数
+  childOrders?: OrderInfo[]  // 子订单列表
 }
 
 /**
@@ -85,13 +88,23 @@ export interface OrderDetail {
   balanceAmount?: number  // 余额支付金额
   otherPaymentAmount?: number  // 其他方式支付金额
   timeLine: TimeLineItem[]
+  parentId?: string | null  // 父订单ID
+  extendCount?: number  // 续费次数
+  childOrders?: OrderInfo[]  // 子订单列表
 }
 
 /**
- * 获取当前订单（分页）
+ * 获取当前订单（分页）- 当天已完成的订单
  */
 export const getActiveOrders = (params?: PageParams) => {
   return http.get<PageResult<OrderInfo>>('/orders/active', { params })
+}
+
+/**
+ * 获取进行中订单（分页）
+ */
+export const getActiveOrdersNow = (params?: PageParams) => {
+  return http.get<PageResult<OrderInfo>>('/orders/active-now', { params })
 }
 
 /**

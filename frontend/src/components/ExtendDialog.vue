@@ -108,10 +108,7 @@
           <!-- 当前订单费用 -->
           <div class="price-item-inline">
             <span class="price-title">当前订单：</span>
-            <span class="price-value-inline">¥{{ currentOrderOriginalAmount.toFixed(2) }}</span>
-            <span v-if="selectedMember && memberDiscount > 0" class="price-final">
-              → <span class="discount">¥{{ (currentOrderOriginalAmount * memberDiscount).toFixed(2) }}</span>
-            </span>
+            <span class="price-value-inline">¥{{ currentOrderAmount.toFixed(2) }}</span>
             <span v-if="table?.originalAmount && table.originalAmount < table.amount" class="price-paid">
               (已付¥{{ currentOrderAmount.toFixed(2) }})
             </span>
@@ -121,7 +118,7 @@
           <div class="price-item-inline">
             <span class="price-title">本次续费：</span>
             <span class="price-value-inline">¥{{ extendOriginalPrice.toFixed(2) }}</span>
-            <span v-if="selectedMember && memberDiscount > 0" class="price-final">
+            <span v-if="(selectedMember && memberDiscount > 0) || (form.applyActivityDiscount && extendFinalAmount > 0)" class="price-final">
               → <span class="discount">¥{{ extendFinalPrice.toFixed(2) }}</span>
             </span>
           </div>
@@ -129,13 +126,7 @@
           <!-- 合计 -->
           <div class="price-item-inline total">
             <span class="price-title">合计：</span>
-            <span class="price-value-inline total">¥{{ totalOriginalAmount.toFixed(2) }}</span>
-            <span v-if="selectedMember" class="price-final">
-              → <span class="discount">¥{{ totalFinalAmount.toFixed(2) }}</span>
-              <span v-if="memberDiscount > 0" class="discount-tag-inline">
-                ({{ (memberDiscount * 10).toFixed(1) }}折)
-              </span>
-            </span>
+            <span class="price-value-inline total">¥{{ totalFinalAmount.toFixed(2) }}</span>
           </div>
         </div>
       </el-form-item>
@@ -266,13 +257,13 @@
         </el-button>
       </div>
     </template>
-
-    <!-- 会员选择弹窗 -->
-    <MemberSelectDialog
-      v-model="memberDialogVisible"
-      @selected="handleMemberSelected"
-    />
   </el-dialog>
+
+  <!-- 会员选择弹窗 - 独立于续费对话框 -->
+  <MemberSelectDialog
+    v-model="memberDialogVisible"
+    @selected="handleMemberSelected"
+  />
 </template>
 
 <script setup lang="ts">
@@ -529,9 +520,10 @@ const totalFinalAmount = computed(() => {
   if (form.value.applyActivityDiscount && extendFinalAmount.value > 0) {
     return (currentOrderAmount.value || 0) + extendFinalAmount.value
   }
-  // 否则使用会员折扣
+  // 否则使用会员折扣（只对续费金额应用会员折扣）
   if (selectedMember.value && memberDiscount.value > 0) {
-    return totalOriginalAmount.value * memberDiscount.value
+    // 当前订单金额 + 续费折后价
+    return (currentOrderAmount.value || 0) + (extendOriginalPrice.value * memberDiscount.value)
   }
   return totalOriginalAmount.value
 })
@@ -899,25 +891,18 @@ const handleDiscountChange = async (discountId: string) => {
   if (!discount) return
   selectedDiscount.value = discount
 
-  // 计算总原价（当前订单 + 续费）
-  const totalOriginalAmount = currentOrderOriginalAmount.value + (extendOriginalPrice.value || 0)
+  // 只对续费金额计算折扣，不包含当前订单金额
+  const extendOriginalAmountValue = extendOriginalPrice.value || 0
 
-  // 如果选择了折扣且有总原价，调用API计算折扣
-  if (discount && totalOriginalAmount > 0) {
+  // 如果选择了折扣且有续费原价，调用API计算折扣
+  if (discount && extendOriginalAmountValue > 0) {
     try {
-      const response = await calculateDiscountById(discountId, totalOriginalAmount, selectedMember.value?.id)
+      // 只对续费金额计算折扣
+      const response = await calculateDiscountById(discountId, extendOriginalAmountValue, selectedMember.value?.id)
 
       if (response && response.finalAmount !== undefined) {
-        // 计算续费后的折后价
-        const currentOrderPaid = currentOrderAmount.value || 0
-        const totalDiscounted = response.finalAmount
-
-        // 续费部分的折后价 = 总折后价 - 当前订单已付部分
-        let extendFinalValue = totalDiscounted - currentOrderPaid
-        if (extendFinalValue < 0) extendFinalValue = 0
-
-        // 更新续费折后价显示
-        extendFinalAmount.value = extendFinalValue
+        // 续费折后价 = API返回的折后价
+        extendFinalAmount.value = response.finalAmount
       }
     } catch (error: any) {
       // 恢复原价
